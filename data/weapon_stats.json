@@ -1,0 +1,37 @@
+{
+  "laser_cannon": {
+    "levels": {
+      "1": { "damage": 10, "cooldown": 0.35, "upgrade_cost": 0 },
+      "2": { "damage": 15, "cooldown": 0.3, "upgrade_cost": 75 },
+      "3": { "damage": 22, "cooldown": 0.25, "upgrade_cost": 150 }
+    }
+  },
+  "plasma_spread": {
+    "levels": {
+      "1": { "damage": 7, "cooldown": 0.55, "upgrade_cost": 0 },
+      "2": { "damage": 11, "cooldown": 0.48, "upgrade_cost": 75 },
+      "3": { "damage": 16, "cooldown": 0.4, "upgrade_cost": 150 }
+    }
+  },
+  "ice_bolt": {
+    "levels": {
+      "1": { "damage": 8, "cooldown": 0.5, "upgrade_cost": 0 },
+      "2": { "damage": 12, "cooldown": 0.44, "upgrade_cost": 75 },
+      "3": { "damage": 18, "cooldown": 0.36, "upgrade_cost": 150 }
+    }
+  },
+  "thunder_rail": {
+    "levels": {
+      "1": { "damage": 14, "cooldown": 0.8, "upgrade_cost": 0 },
+      "2": { "damage": 21, "cooldown": 0.7, "upgrade_cost": 75 },
+      "3": { "damage": 32, "cooldown": 0.6, "upgrade_cost": 150 }
+    }
+  },
+  "missile_salvo": {
+    "levels": {
+      "1": { "damage": 18, "cooldown": 1.1, "upgrade_cost": 0 },
+      "2": { "damage": 27, "cooldown": 0.95, "upgrade_cost": 75 },
+      "3": { "damage": 40, "cooldown": 0.8, "upgrade_cost": 150 }
+    }
+  }
+}

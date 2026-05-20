@@ -1,0 +1,39 @@
+{
+  "map_1": {
+    "chicken_grunt": { "hp": 20, "speed": 80, "fc_drop": 5 },
+    "egg_bomber": { "hp": 26, "speed": 55, "fc_drop": 8 },
+    "kamikaze": { "hp": 16, "speed": 120, "fc_drop": 6 },
+    "space_rooster": { "hp": 350, "speed": 40, "fc_drop": 60 }
+  },
+  "map_2": {
+    "chicken_grunt": { "hp": 28, "speed": 88, "fc_drop": 6 },
+    "egg_bomber": { "hp": 36, "speed": 60, "fc_drop": 10 },
+    "kamikaze": { "hp": 22, "speed": 130, "fc_drop": 7 },
+    "armored_rooster": { "hp": 60, "speed": 45, "fc_drop": 14 },
+    "space_rooster": { "hp": 475, "speed": 45, "fc_drop": 80 }
+  },
+  "map_3": {
+    "chicken_grunt": { "hp": 36, "speed": 96, "fc_drop": 7 },
+    "egg_bomber": { "hp": 46, "speed": 65, "fc_drop": 12 },
+    "kamikaze": { "hp": 28, "speed": 140, "fc_drop": 8 },
+    "armored_rooster": { "hp": 78, "speed": 50, "fc_drop": 16 },
+    "dodge_hen": { "hp": 44, "speed": 115, "fc_drop": 18 },
+    "space_rooster": { "hp": 625, "speed": 50, "fc_drop": 100 }
+  },
+  "map_4": {
+    "chicken_grunt": { "hp": 44, "speed": 104, "fc_drop": 8 },
+    "egg_bomber": { "hp": 58, "speed": 70, "fc_drop": 14 },
+    "kamikaze": { "hp": 34, "speed": 150, "fc_drop": 9 },
+    "armored_rooster": { "hp": 96, "speed": 55, "fc_drop": 18 },
+    "dodge_hen": { "hp": 58, "speed": 125, "fc_drop": 20 },
+    "chicken_overlord": { "hp": 900, "speed": 35, "fc_drop": 140 }
+  },
+  "map_5": {
+    "chicken_grunt": { "hp": 54, "speed": 112, "fc_drop": 9 },
+    "egg_bomber": { "hp": 72, "speed": 75, "fc_drop": 16 },
+    "kamikaze": { "hp": 42, "speed": 160, "fc_drop": 10 },
+    "armored_rooster": { "hp": 120, "speed": 60, "fc_drop": 20 },
+    "dodge_hen": { "hp": 74, "speed": 135, "fc_drop": 22 },
+    "chicken_overlord": { "hp": 1200, "speed": 40, "fc_drop": 180 }
+  }
+}
