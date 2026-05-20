@@ -1,8 +1,140 @@
-"""Combo effect placeholder."""
+"""Weapon combo effect implementation."""
+
+from __future__ import annotations
+
+from enum import Enum
+from typing import Sequence
+
+from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
+from src.weapons.weapon import DEFAULT_CHAIN_TARGETS, DEFAULT_EXPLOSION_RADIUS, MAX_WEAPON_LEVEL, WeaponType
+
+ION_BEAM_EXPLOSION_RADIUS = 72.0
+CRYO_BURST_RADIUS = 96.0
+CRYO_BURST_FREEZE_SECONDS = 1.5
+STORM_FIELD_RADIUS = 110.0
+STORM_FIELD_SLOW_SECONDS = 2.0
+STORM_FIELD_STUN_SECONDS = 0.75
+VOLT_BEAM_CHAIN_TARGETS = 4
+HOMING_NOVA_RADIUS = 128.0
 
 
-# stub — will be implemented in Phase [X], Prompt [Y]
+class ComboType(Enum):
+    """Enum describing supported tier 2 weapon combo effects."""
+
+    ION_BEAM = "ION_BEAM"
+    CRYO_BURST = "CRYO_BURST"
+    STORM_FIELD = "STORM_FIELD"
+    VOLT_BEAM = "VOLT_BEAM"
+    HOMING_NOVA = "HOMING_NOVA"
+
+
+COMBO_MAP: dict[frozenset[WeaponType], ComboType] = {
+    frozenset((WeaponType.LASER, WeaponType.PLASMA)): ComboType.ION_BEAM,
+    frozenset((WeaponType.PLASMA, WeaponType.ICE)): ComboType.CRYO_BURST,
+    frozenset((WeaponType.ICE, WeaponType.THUNDER)): ComboType.STORM_FIELD,
+    frozenset((WeaponType.THUNDER, WeaponType.LASER)): ComboType.VOLT_BEAM,
+    frozenset((WeaponType.MISSILE, WeaponType.PLASMA)): ComboType.HOMING_NOVA,
+}
+
+
 class ComboEffect:
-    """Placeholder for effects created by compatible weapon combinations."""
+    """Resolves and applies behavior modifiers for two-weapon combo effects."""
 
-    pass
+    def __init__(
+        self,
+        first_weapon_type: WeaponType,
+        second_weapon_type: WeaponType,
+        first_weapon_level: int = MAX_WEAPON_LEVEL,
+        second_weapon_level: int = MAX_WEAPON_LEVEL,
+    ) -> None:
+        """Resolve the combo for two weapon types and record tier 2 unlock state."""
+        self.first_weapon_type = first_weapon_type
+        self.second_weapon_type = second_weapon_type
+        self.combo_type = COMBO_MAP.get(frozenset((first_weapon_type, second_weapon_type)))
+        self.required_level = MAX_WEAPON_LEVEL
+        self.is_unlocked = (
+            self.combo_type is not None
+            and first_weapon_level >= self.required_level
+            and second_weapon_level >= self.required_level
+        )
+
+    def apply(self, bullets: list[Bullet], targets: Sequence[object]) -> list[Bullet]:
+        """Modify bullet behavior in place according to the resolved combo."""
+        if self.combo_type is None or not self.is_unlocked:
+            return bullets
+
+        for bullet in bullets:
+            bullet.combo_type = self.combo_type
+            bullet.combo_targets = list(targets)
+            if self.combo_type is ComboType.ION_BEAM:
+                self._apply_ion_beam(bullet)
+            elif self.combo_type is ComboType.CRYO_BURST:
+                self._apply_cryo_burst(bullet)
+            elif self.combo_type is ComboType.STORM_FIELD:
+                self._apply_storm_field(bullet)
+            elif self.combo_type is ComboType.VOLT_BEAM:
+                self._apply_volt_beam(bullet)
+            elif self.combo_type is ComboType.HOMING_NOVA:
+                self._apply_homing_nova(bullet)
+
+        return bullets
+
+    def _apply_ion_beam(self, bullet: Bullet) -> None:
+        """Add piercing and explosion behavior for Laser plus Plasma."""
+        bullet.piercing = True
+        bullet.explosion_radius = max(
+            getattr(bullet, "explosion_radius", DEFAULT_EXPLOSION_RADIUS),
+            ION_BEAM_EXPLOSION_RADIUS,
+        )
+        bullet.explodes = True
+
+    def _apply_cryo_burst(self, bullet: Bullet) -> None:
+        """Add freeze AOE behavior for Plasma plus Ice."""
+        bullet.explosion_radius = max(
+            getattr(bullet, "explosion_radius", DEFAULT_EXPLOSION_RADIUS),
+            CRYO_BURST_RADIUS,
+        )
+        bullet.explodes = True
+        _merge_debuffs(
+            bullet,
+            {
+                "FROZEN": {
+                    "duration": CRYO_BURST_FREEZE_SECONDS,
+                    "radius": CRYO_BURST_RADIUS,
+                }
+            },
+        )
+
+    def _apply_storm_field(self, bullet: Bullet) -> None:
+        """Add slow and stun field behavior for Ice plus Thunder."""
+        bullet.field_radius = STORM_FIELD_RADIUS
+        _merge_debuffs(
+            bullet,
+            {
+                "SLOWED": {"duration": STORM_FIELD_SLOW_SECONDS, "radius": STORM_FIELD_RADIUS},
+                "STUNNED": {"duration": STORM_FIELD_STUN_SECONDS, "radius": STORM_FIELD_RADIUS},
+            },
+        )
+
+    def _apply_volt_beam(self, bullet: Bullet) -> None:
+        """Add piercing and chain behavior for Thunder plus Laser."""
+        bullet.piercing = True
+        bullet.chain_targets = max(getattr(bullet, "chain_targets", DEFAULT_CHAIN_TARGETS), VOLT_BEAM_CHAIN_TARGETS)
+
+    def _apply_homing_nova(self, bullet: Bullet) -> None:
+        """Add homing and AOE behavior for Missile plus Plasma."""
+        bullet.homing = True
+        bullet.tracking_mode = "nearest_enemy"
+        bullet.explosion_radius = max(
+            getattr(bullet, "explosion_radius", DEFAULT_EXPLOSION_RADIUS),
+            HOMING_NOVA_RADIUS,
+        )
+        bullet.explodes = True
+
+
+def _merge_debuffs(bullet: Bullet, debuffs: dict[str, object]) -> None:
+    """Merge combo debuffs onto a Bullet stub without owning future hit logic."""
+    existing_debuffs = getattr(bullet, "debuffs", {})
+    merged_debuffs = dict(existing_debuffs)
+    merged_debuffs.update(debuffs)
+    bullet.debuffs = merged_debuffs
