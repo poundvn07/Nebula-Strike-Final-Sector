@@ -5,7 +5,7 @@ from __future__ import annotations
 import pygame
 
 from src.entities.bullet import Bullet
-from src.entities.feather_core import FeatherCore  # TODO: implement in Phase X — use stub for now
+from src.entities.feather_core import FeatherCore
 from src.entities.player_ship import PlayerShip
 from src.enemies.enemy import Enemy
 from src.utils.constants import MIN_HEALTH
@@ -57,6 +57,8 @@ class CollisionSystem:
         """Apply player bullet damage to colliding enemies and collect drops."""
         bullet_rect = _get_bullet_collision_rect(bullet)
         for enemy in enemies:
+            if not hasattr(enemy, "get_rect") or not hasattr(enemy, "is_alive"):
+                continue
             if not getattr(enemy, "active", True):
                 continue
             if not bullet_rect.colliderect(enemy.get_rect()):
@@ -84,8 +86,7 @@ class CollisionSystem:
             if not player_rect.colliderect(_get_fc_rect(fc_item)):
                 continue
 
-            player.add_fc(int(getattr(fc_item, "value", FC_DEFAULT_VALUE)))
-            fc_item.active = False
+            player.add_fc(_collect_fc_item(fc_item))
             self.fc_streak_counter += 1
             player.fc_streak_counter = self.fc_streak_counter
 
@@ -95,23 +96,21 @@ def _get_bullet_owner(bullet: Bullet) -> str:
     owner = getattr(bullet, "owner", None)
     if owner in (PLAYER_OWNER, ENEMY_OWNER):
         return owner
-    if getattr(bullet, "is_enemy_projectile", False):
-        return ENEMY_OWNER
     return PLAYER_OWNER
 
 
 def _get_bullet_collision_rect(bullet: Bullet) -> pygame.Rect:
     """Return the bullet collision rect, inflated for AOE bullets."""
     rect = bullet.get_rect()
-    aoe_radius = int(getattr(bullet, "aoe_radius", getattr(bullet, "explosion_radius", MIN_HEALTH)))
-    is_aoe = bool(getattr(bullet, "is_aoe", False) or getattr(bullet, "explodes", False) or aoe_radius > MIN_HEALTH)
+    aoe_radius = int(bullet.aoe_radius)
+    is_aoe = bool(bullet.is_aoe or aoe_radius > MIN_HEALTH)
     if is_aoe and aoe_radius > MIN_HEALTH:
         return rect.inflate(aoe_radius * AOE_DIAMETER_MULTIPLIER, aoe_radius * AOE_DIAMETER_MULTIPLIER)
     return rect
 
 
 def _get_fc_rect(fc_item: FeatherCore) -> pygame.Rect:
-    """Return a pygame.Rect for a Feather Core placeholder item."""
+    """Return a pygame.Rect for a Feather Core item."""
     if hasattr(fc_item, "get_rect"):
         return fc_item.get_rect()
 
@@ -121,3 +120,12 @@ def _get_fc_rect(fc_item: FeatherCore) -> pygame.Rect:
         int(getattr(fc_item, "width", FC_ITEM_DEFAULT_SIZE)),
         int(getattr(fc_item, "height", FC_ITEM_DEFAULT_SIZE)),
     )
+
+
+def _collect_fc_item(fc_item: FeatherCore) -> int:
+    """Collect a Feather Core object or deactivate a legacy placeholder."""
+    if hasattr(fc_item, "collect"):
+        return int(fc_item.collect())
+
+    fc_item.active = False
+    return int(getattr(fc_item, "value", FC_DEFAULT_VALUE))

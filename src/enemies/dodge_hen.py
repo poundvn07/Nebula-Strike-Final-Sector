@@ -6,7 +6,7 @@ from math import sin
 from typing import Sequence
 
 from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
-from src.entities.feather_core import FeatherCore  # TODO: implement in Phase X — use stub for now
+from src.entities.feather_core import FeatherCore
 from src.enemies.enemy import Enemy
 from src.utils.constants import MIN_HEALTH
 from src.weapons.weapon import WeaponType

@@ -32,7 +32,7 @@ class ThunderRail(Weapon):
         if not self.can_fire():
             return []
 
-        chain_targets = (
+        chain_count = (
             THUNDER_LEVEL_THREE_CHAIN_TARGETS
             if self.upgrade_level >= MAX_WEAPON_LEVEL
             else THUNDER_DEFAULT_CHAIN_TARGETS
@@ -42,7 +42,7 @@ class ThunderRail(Weapon):
             origin_y=origin_y,
             direction=direction,
             speed=THUNDER_PROJECTILE_SPEED,
-            chain_targets=chain_targets,
+            chain_count=chain_count,
         )
         self._start_cooldown()
         return [bullet]

@@ -10,7 +10,7 @@ from typing import TypeAlias
 import pygame
 
 from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
-from src.entities.feather_core import FeatherCore  # TODO: implement in Phase X — use stub for now
+from src.entities.feather_core import FeatherCore
 from src.entities.game_object import GameObject
 from src.utils.constants import MIN_HEALTH
 
@@ -78,6 +78,7 @@ class Enemy(GameObject):
 
     def update(self, dt: float) -> None:
         """Advance enemy behavior by moving and storing emitted attacks."""
+        self.update_debuffs(dt)
         self.move(dt)
         self.last_attack_bullets = self.attack(dt)
 
@@ -98,18 +99,51 @@ class Enemy(GameObject):
         return []
 
     def drop_fc(self) -> list[FeatherCore]:
-        """Create a random number of Feather Core stubs within the enemy drop range."""
+        """Create a random number of Feather Core pickups within the enemy drop range."""
         drop_count = randint(self.fc_drop_min, self.fc_drop_max)
         return [self._create_feather_core(drop_index) for drop_index in range(drop_count)]
 
+    def apply_debuff(self, debuff_type: str, duration: float) -> None:
+        """
+        Apply a status effect to this enemy.
+        Stores active debuffs in self._active_debuffs dict.
+        OOP note: base class provides default debuff storage;
+        subclasses can override to add special reactions
+        (e.g. ArmoredRooster ignores SLOWED, IceBolt bypasses armor).
+        """
+        if not hasattr(self, "_active_debuffs"):
+            self._active_debuffs = {}
+        self._active_debuffs[debuff_type] = duration
+
+    def update_debuffs(self, dt: float) -> None:
+        """Tick all active debuff durations. Remove expired debuffs."""
+        if not hasattr(self, "_active_debuffs"):
+            self._active_debuffs = {}
+            return
+        expired = [k for k, v in self._active_debuffs.items() if v - dt <= 0]
+        for k in expired:
+            del self._active_debuffs[k]
+        for k in self._active_debuffs:
+            self._active_debuffs[k] -= dt
+
+    @property
+    def is_slowed(self) -> bool:
+        """Return whether this enemy currently has the SLOWED debuff."""
+        return hasattr(self, "_active_debuffs") and "SLOWED" in self._active_debuffs
+
+    @property
+    def is_stunned(self) -> bool:
+        """Return whether this enemy currently has the STUNNED debuff."""
+        return hasattr(self, "_active_debuffs") and "STUNNED" in self._active_debuffs
+
     def _create_feather_core(self, drop_index: int) -> FeatherCore:
-        """Create one configured Feather Core stub without implementing pickup logic."""
-        feather_core = FeatherCore()
-        feather_core.x = self.x + drop_index * FEATHER_CORE_DROP_SPACING
-        feather_core.y = self.y
-        feather_core.value = FEATHER_CORE_UNIT_VALUE
+        """Create one configured Feather Core pickup."""
+        feather_core = FeatherCore(
+            x=self.x + drop_index * FEATHER_CORE_DROP_SPACING,
+            y=self.y,
+            value=FEATHER_CORE_UNIT_VALUE,
+        )
         feather_core.source_enemy = self.__class__.__name__
-        feather_core.active = True
         return feather_core
 
     def _create_enemy_bullet(
@@ -132,7 +166,7 @@ class Enemy(GameObject):
         bullet.width = width
         bullet.height = height
         bullet.damage = damage
-        bullet.is_enemy_projectile = True
+        bullet.owner = "enemy"
         bullet.is_aoe = is_aoe
         bullet.source_enemy = self.__class__.__name__
         bullet.metadata = dict(metadata or {})

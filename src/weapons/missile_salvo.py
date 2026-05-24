@@ -37,7 +37,7 @@ class MissileSalvo(Weapon):
             direction=direction,
             speed=MISSILE_PROJECTILE_SPEED,
             homing=True,
-            explosion_radius=MISSILE_EXPLOSION_RADIUS,
+            aoe_radius=int(MISSILE_EXPLOSION_RADIUS),
         )
         self._start_cooldown()
         return [bullet]

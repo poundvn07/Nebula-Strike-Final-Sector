@@ -57,12 +57,17 @@ class PlayerShip(GameObject):
         self.weapon_slots: list[Weapon | None] = [None for _ in range(PLAYER_WEAPON_SLOT_COUNT)]
         self.special_slot: Weapon | None = None
         self.drones: list[Drone] = list(drones or [])[:MAX_ACTIVE_DRONES]
-        self.fc_inventory = PLAYER_INITIAL_FC
+        self._fc_inventory = PLAYER_INITIAL_FC
         self.score = PLAYER_INITIAL_SCORE
         self.aiming_mode = AimingMode.MANUAL
         self.auto_targets: list[GameObject] = []
         self.active_combo: ComboEffect | None = None
         self.fc_streak_counter = PLAYER_INITIAL_FC
+
+    @property
+    def fc_inventory(self) -> int:
+        """Return the player's Feather Core inventory."""
+        return self._fc_inventory
 
     def update(self, dt: float) -> None:
         """Update weapon cooldowns; movement is driven by move(keys, dt)."""
@@ -104,7 +109,6 @@ class PlayerShip(GameObject):
 
     def fire(self, dt: float) -> list[Bullet]:
         """Fire equipped weapons and apply active combo behavior when available."""
-        self.update(dt)
         self._recalculate_combo()
         bullets: list[Bullet] = []
         muzzle_offsets = (PLAYER_LEFT_MUZZLE_OFFSET, PLAYER_RIGHT_MUZZLE_OFFSET)
@@ -176,14 +180,26 @@ class PlayerShip(GameObject):
 
         spent_fc = repair_chunks * PLAYER_REPAIR_FC_CHUNK
         restored_hp = hp_per_chunk * repair_chunks
-        self.fc_inventory -= spent_fc
+        if not self.spend_fc(spent_fc):
+            return PLAYER_INITIAL_FC
+
         self.hp = min(self.max_hp, self.hp + restored_hp)
         return spent_fc
 
     def add_fc(self, amount: int) -> None:
         """Add Feather Core currency to the player inventory."""
-        if amount > MIN_HEALTH:
-            self.fc_inventory += amount
+        self._fc_inventory += amount
+
+    def spend_fc(self, amount: int) -> bool:
+        """Spend Feather Core currency if enough is available."""
+        if self._fc_inventory >= amount:
+            self._fc_inventory -= amount
+            return True
+        return False
+
+    def apply_debuff(self, debuff_type: str, duration: float) -> None:
+        """Stub — player debuff effects not implemented yet (Phase 3)."""
+        pass
 
     def toggle_aiming_mode(self) -> AimingMode:
         """Toggle between automatic nearest-target aiming and manual straight fire."""
@@ -259,8 +275,8 @@ def _mark_player_bullet(bullet: Bullet) -> None:
 
 
 def _sync_bullet_aliases(bullet: Bullet) -> None:
-    """Keep legacy weapon fields and Bullet fields aligned."""
-    bullet.is_piercing = bool(getattr(bullet, "is_piercing", getattr(bullet, "piercing", False)))
-    aoe_radius = int(getattr(bullet, "aoe_radius", getattr(bullet, "explosion_radius", MIN_HEALTH)))
+    """Keep weapon-created bullets aligned with canonical Bullet fields."""
+    bullet.is_piercing = bool(bullet.is_piercing)
+    aoe_radius = int(bullet.aoe_radius)
     bullet.aoe_radius = aoe_radius
-    bullet.is_aoe = bool(getattr(bullet, "is_aoe", False) or getattr(bullet, "explodes", False) or aoe_radius > MIN_HEALTH)
+    bullet.is_aoe = bool(bullet.is_aoe or aoe_radius > MIN_HEALTH)

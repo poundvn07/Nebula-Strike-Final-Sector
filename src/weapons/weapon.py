@@ -24,8 +24,9 @@ NO_UPGRADE_AVAILABLE_COST = 0
 DEFAULT_FIRE_DIRECTION: Direction = (0.0, -1.0)
 DEFAULT_PROJECTILE_WIDTH = 8
 DEFAULT_PROJECTILE_HEIGHT = 16
-DEFAULT_CHAIN_TARGETS = 0
-DEFAULT_EXPLOSION_RADIUS = 0.0
+DEFAULT_CHAIN_COUNT = 0
+DEFAULT_AOE_RADIUS = 0
+PLAYER_BULLET_OWNER = "player"
 
 
 class WeaponType(Enum):
@@ -98,12 +99,13 @@ class Weapon(ABC):
         *,
         width: int = DEFAULT_PROJECTILE_WIDTH,
         height: int = DEFAULT_PROJECTILE_HEIGHT,
-        piercing: bool = False,
-        chain_targets: int = DEFAULT_CHAIN_TARGETS,
+        is_piercing: bool = False,
+        chain_count: int = DEFAULT_CHAIN_COUNT,
         homing: bool = False,
-        explosion_radius: float = DEFAULT_EXPLOSION_RADIUS,
+        aoe_radius: int = DEFAULT_AOE_RADIUS,
         debuffs: dict[str, object] | None = None,
         metadata: dict[str, object] | None = None,
+        owner: str = PLAYER_BULLET_OWNER,
     ) -> Bullet:
         """Create a configured Bullet stub without implementing bullet physics yet."""
         normalized_x, normalized_y = normalize_direction(direction)
@@ -115,14 +117,16 @@ class Weapon(ABC):
         bullet.width = width
         bullet.height = height
         bullet.damage = self.damage
+        bullet.owner = owner
         bullet.weapon_type = self.weapon_type
         bullet.source_weapon = self.name
         bullet.upgrade_level = self.upgrade_level
-        bullet.piercing = piercing
-        bullet.chain_targets = chain_targets
+        bullet.is_piercing = is_piercing
+        bullet.chain_count = chain_count
         bullet.homing = homing
         bullet.tracking_mode = "nearest_enemy" if homing else None
-        bullet.explosion_radius = explosion_radius
+        bullet.aoe_radius = aoe_radius
+        bullet.is_aoe = aoe_radius > DEFAULT_AOE_RADIUS
         bullet.debuffs = dict(debuffs or {})
         bullet.metadata = dict(metadata or {})
         bullet.active = True

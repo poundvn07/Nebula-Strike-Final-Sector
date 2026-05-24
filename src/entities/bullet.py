@@ -22,7 +22,7 @@ BULLET_DEFAULT_VELOCITY = 0.0
 BULLET_DEFAULT_WIDTH = 8
 BULLET_DEFAULT_HEIGHT = 12
 BULLET_DEFAULT_HP = 1
-BULLET_DEFAULT_DAMAGE = 1
+BULLET_DEFAULT_DAMAGE = 0.0
 BULLET_DEFAULT_AOE_RADIUS = 0
 BULLET_OFFSCREEN_MARGIN = 64
 BULLET_POOL_DEFAULT_SIZE = 128
@@ -32,7 +32,23 @@ ENEMY_BULLET_COLOR = (255, 180, 80)
 
 
 class Bullet(GameObject):
-    """GameObject projectile that carries owner, damage, and weapon effect data."""
+    """CANONICAL FIELD CONTRACT (Phase 2+):
+      owner: str                  'player' or 'enemy'
+      damage: float
+      weapon_type: WeaponType | None
+      is_piercing: bool
+      is_aoe: bool
+      aoe_radius: int
+      debuffs: dict               {debuff_name: duration_seconds}
+      chain_count: int
+      combo_targets: list         populated by ComboEffect.apply()
+    Removed legacy aliases: explodes, explosion_radius, is_enemy_projectile,
+                            piercing, debuff (str), chain_targets
+
+    GameObject projectile that carries owner, damage, and weapon effect data.
+    """
+
+    # NOTE: external callers may use legacy name — fix in CollisionSystem Phase 3
 
     def __init__(
         self,
@@ -40,12 +56,14 @@ class Bullet(GameObject):
         y: float = BULLET_DEFAULT_Y,
         vx: float = BULLET_DEFAULT_VELOCITY,
         vy: float = BULLET_DEFAULT_VELOCITY,
-        damage: int = BULLET_DEFAULT_DAMAGE,
-        owner: BulletOwner = PLAYER_BULLET_OWNER,
+        damage: float = BULLET_DEFAULT_DAMAGE,
+        owner: str = PLAYER_BULLET_OWNER,
         weapon_type: "WeaponType | None" = None,
         is_piercing: bool = False,
         is_aoe: bool = False,
         aoe_radius: int = BULLET_DEFAULT_AOE_RADIUS,
+        debuffs: dict | None = None,
+        chain_count: int = 0,
         width: int = BULLET_DEFAULT_WIDTH,
         height: int = BULLET_DEFAULT_HEIGHT,
     ) -> None:
@@ -62,28 +80,11 @@ class Bullet(GameObject):
             is_piercing=is_piercing,
             is_aoe=is_aoe,
             aoe_radius=aoe_radius,
+            debuffs=debuffs,
+            chain_count=chain_count,
             width=width,
             height=height,
         )
-
-    @property
-    def piercing(self) -> bool:
-        """Alias used by weapon combo code for piercing bullets."""
-        return self.is_piercing
-
-    @piercing.setter
-    def piercing(self, value: bool) -> None:
-        self.is_piercing = value
-
-    @property
-    def explosion_radius(self) -> int:
-        """Alias used by weapon combo code for AOE radius."""
-        return self.aoe_radius
-
-    @explosion_radius.setter
-    def explosion_radius(self, value: float) -> None:
-        self.aoe_radius = int(value)
-        self.is_aoe = self.aoe_radius > BULLET_DEFAULT_AOE_RADIUS
 
     def reset(
         self,
@@ -91,12 +92,14 @@ class Bullet(GameObject):
         y: float = BULLET_DEFAULT_Y,
         vx: float = BULLET_DEFAULT_VELOCITY,
         vy: float = BULLET_DEFAULT_VELOCITY,
-        damage: int = BULLET_DEFAULT_DAMAGE,
-        owner: BulletOwner = PLAYER_BULLET_OWNER,
+        damage: float = BULLET_DEFAULT_DAMAGE,
+        owner: str = PLAYER_BULLET_OWNER,
         weapon_type: "WeaponType | None" = None,
         is_piercing: bool = False,
         is_aoe: bool = False,
         aoe_radius: int = BULLET_DEFAULT_AOE_RADIUS,
+        debuffs: dict | None = None,
+        chain_count: int = 0,
         width: int = BULLET_DEFAULT_WIDTH,
         height: int = BULLET_DEFAULT_HEIGHT,
     ) -> None:
@@ -110,15 +113,15 @@ class Bullet(GameObject):
         self.hp = BULLET_DEFAULT_HP
         self.max_hp = BULLET_DEFAULT_HP
         self.active = True
-        self.damage = damage
-        self.owner = owner
-        self.weapon_type = weapon_type
-        self.is_piercing = is_piercing
-        self.is_aoe = is_aoe or aoe_radius > BULLET_DEFAULT_AOE_RADIUS
-        self.aoe_radius = aoe_radius
-        self.debuffs: dict[str, object] = {}
-        self.chain_targets = 0
-        self.combo_targets: list[object] = []
+        self.owner: str = owner
+        self.damage: float = damage
+        self.weapon_type: WeaponType | None = weapon_type
+        self.is_piercing: bool = is_piercing
+        self.is_aoe: bool = is_aoe or aoe_radius > BULLET_DEFAULT_AOE_RADIUS
+        self.aoe_radius: int = aoe_radius
+        self.debuffs: dict = dict(debuffs or {})
+        self.chain_count: int = chain_count
+        self.combo_targets: list = []
         self.metadata: dict[str, object] = {}
 
     def update(self, dt: float) -> None:
@@ -152,18 +155,13 @@ class Bullet(GameObject):
         return drops
 
     def _apply_status_effects(self, target: object) -> None:
-        """Attach slow, stun, freeze, or other debuffs to a target object."""
-        if not self.debuffs:
-            return
-
-        existing_effects = getattr(target, "status_effects", {})
-        merged_effects = dict(existing_effects)
-        merged_effects.update(self.debuffs)
-        target.status_effects = merged_effects
+        """Attach the configured status effect to a target object."""
+        for debuff_type, duration in self.debuffs.items():
+            target.apply_debuff(debuff_type, duration)
 
     def _apply_chain_effects(self, target: object) -> None:
         """Apply reduced chain damage to combo-provided nearby targets."""
-        if self.chain_targets <= MIN_HEALTH or not self.combo_targets:
+        if self.chain_count <= MIN_HEALTH or not self.combo_targets:
             return
 
         chain_damage = int(self.damage * CHAIN_DAMAGE_MULTIPLIER)
@@ -173,7 +171,7 @@ class Bullet(GameObject):
                 continue
             _apply_damage(chained_target, chain_damage, self.weapon_type, self.is_aoe)
             chained += 1
-            if chained >= self.chain_targets:
+            if chained >= self.chain_count:
                 return
 
 
@@ -191,12 +189,14 @@ class BulletPool:
         y: float = BULLET_DEFAULT_Y,
         vx: float = BULLET_DEFAULT_VELOCITY,
         vy: float = BULLET_DEFAULT_VELOCITY,
-        damage: int = BULLET_DEFAULT_DAMAGE,
-        owner: BulletOwner = PLAYER_BULLET_OWNER,
+        damage: float = BULLET_DEFAULT_DAMAGE,
+        owner: str = PLAYER_BULLET_OWNER,
         weapon_type: "WeaponType | None" = None,
         is_piercing: bool = False,
         is_aoe: bool = False,
         aoe_radius: int = BULLET_DEFAULT_AOE_RADIUS,
+        debuffs: dict | None = None,
+        chain_count: int = 0,
         width: int = BULLET_DEFAULT_WIDTH,
         height: int = BULLET_DEFAULT_HEIGHT,
     ) -> Bullet:
@@ -213,6 +213,8 @@ class BulletPool:
             is_piercing=is_piercing,
             is_aoe=is_aoe,
             aoe_radius=aoe_radius,
+            debuffs=debuffs,
+            chain_count=chain_count,
             width=width,
             height=height,
         )
@@ -227,7 +229,7 @@ class BulletPool:
 
 def _apply_damage(
     target: object,
-    damage: int,
+    damage: float,
     weapon_type: "WeaponType | None",
     is_aoe: bool,
 ) -> list[object]:

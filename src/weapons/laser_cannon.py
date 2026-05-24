@@ -35,7 +35,7 @@ class LaserCannon(Weapon):
             origin_y=origin_y,
             direction=direction,
             speed=LASER_PROJECTILE_SPEED,
-            piercing=self.upgrade_level >= MAX_WEAPON_LEVEL,
+            is_piercing=self.upgrade_level >= MAX_WEAPON_LEVEL,
         )
         self._start_cooldown()
         return [bullet]

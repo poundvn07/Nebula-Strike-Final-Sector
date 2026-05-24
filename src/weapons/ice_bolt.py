@@ -39,10 +39,7 @@ class IceBolt(Weapon):
             direction=direction,
             speed=ICE_PROJECTILE_SPEED,
             debuffs={
-                ICE_SLOW_DEBUFF: {
-                    "duration": ICE_SLOW_DURATION_SECONDS,
-                    "multiplier": ICE_SLOW_MULTIPLIER,
-                }
+                ICE_SLOW_DEBUFF: ICE_SLOW_DURATION_SECONDS,
             },
         )
         self._start_cooldown()

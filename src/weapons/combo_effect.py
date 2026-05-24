@@ -6,16 +6,17 @@ from enum import Enum
 from typing import Sequence
 
 from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
-from src.weapons.weapon import DEFAULT_CHAIN_TARGETS, DEFAULT_EXPLOSION_RADIUS, MAX_WEAPON_LEVEL, WeaponType
+from src.weapons.weapon import MAX_WEAPON_LEVEL, WeaponType
 
-ION_BEAM_EXPLOSION_RADIUS = 72.0
-CRYO_BURST_RADIUS = 96.0
-CRYO_BURST_FREEZE_SECONDS = 1.5
-STORM_FIELD_RADIUS = 110.0
+ION_BEAM_AOE_RADIUS = 40
+CRYO_BURST_AOE_RADIUS = 80
+CRYO_BURST_SLOW_SECONDS = 3.0
+CRYO_BURST_FREEZE_SECONDS = 1.0
+STORM_FIELD_AOE_RADIUS = 60
 STORM_FIELD_SLOW_SECONDS = 2.0
-STORM_FIELD_STUN_SECONDS = 0.75
-VOLT_BEAM_CHAIN_TARGETS = 4
-HOMING_NOVA_RADIUS = 128.0
+STORM_FIELD_STUN_SECONDS = 1.0
+VOLT_BEAM_CHAIN_COUNT = 3
+HOMING_NOVA_AOE_RADIUS = 50
 
 
 class ComboType(Enum):
@@ -81,55 +82,45 @@ class ComboEffect:
 
     def _apply_ion_beam(self, bullet: Bullet) -> None:
         """Add piercing and explosion behavior for Laser plus Plasma."""
-        bullet.piercing = True
-        bullet.explosion_radius = max(
-            getattr(bullet, "explosion_radius", DEFAULT_EXPLOSION_RADIUS),
-            ION_BEAM_EXPLOSION_RADIUS,
-        )
-        bullet.explodes = True
+        bullet.is_piercing = True
+        bullet.is_aoe = True
+        bullet.aoe_radius = ION_BEAM_AOE_RADIUS
 
     def _apply_cryo_burst(self, bullet: Bullet) -> None:
         """Add freeze AOE behavior for Plasma plus Ice."""
-        bullet.explosion_radius = max(
-            getattr(bullet, "explosion_radius", DEFAULT_EXPLOSION_RADIUS),
-            CRYO_BURST_RADIUS,
-        )
-        bullet.explodes = True
+        bullet.is_aoe = True
+        bullet.aoe_radius = CRYO_BURST_AOE_RADIUS
         _merge_debuffs(
             bullet,
             {
-                "FROZEN": {
-                    "duration": CRYO_BURST_FREEZE_SECONDS,
-                    "radius": CRYO_BURST_RADIUS,
-                }
+                "SLOWED": CRYO_BURST_SLOW_SECONDS,
+                "FROZEN": CRYO_BURST_FREEZE_SECONDS,
             },
         )
 
     def _apply_storm_field(self, bullet: Bullet) -> None:
         """Add slow and stun field behavior for Ice plus Thunder."""
-        bullet.field_radius = STORM_FIELD_RADIUS
+        bullet.is_aoe = True
+        bullet.aoe_radius = STORM_FIELD_AOE_RADIUS
         _merge_debuffs(
             bullet,
             {
-                "SLOWED": {"duration": STORM_FIELD_SLOW_SECONDS, "radius": STORM_FIELD_RADIUS},
-                "STUNNED": {"duration": STORM_FIELD_STUN_SECONDS, "radius": STORM_FIELD_RADIUS},
+                "SLOWED": STORM_FIELD_SLOW_SECONDS,
+                "STUNNED": STORM_FIELD_STUN_SECONDS,
             },
         )
 
     def _apply_volt_beam(self, bullet: Bullet) -> None:
         """Add piercing and chain behavior for Thunder plus Laser."""
-        bullet.piercing = True
-        bullet.chain_targets = max(getattr(bullet, "chain_targets", DEFAULT_CHAIN_TARGETS), VOLT_BEAM_CHAIN_TARGETS)
+        bullet.is_piercing = True
+        bullet.chain_count = VOLT_BEAM_CHAIN_COUNT
 
     def _apply_homing_nova(self, bullet: Bullet) -> None:
         """Add homing and AOE behavior for Missile plus Plasma."""
         bullet.homing = True
         bullet.tracking_mode = "nearest_enemy"
-        bullet.explosion_radius = max(
-            getattr(bullet, "explosion_radius", DEFAULT_EXPLOSION_RADIUS),
-            HOMING_NOVA_RADIUS,
-        )
-        bullet.explodes = True
+        bullet.is_aoe = True
+        bullet.aoe_radius = HOMING_NOVA_AOE_RADIUS
 
 
 def _merge_debuffs(bullet: Bullet, debuffs: dict[str, object]) -> None:
