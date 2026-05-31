@@ -23,6 +23,7 @@ FEATHER_CORE_MIN_RADIUS = 6
 FEATHER_CORE_MAX_RADIUS = 10
 FEATHER_CORE_COLOR = (255, 220, 50)
 FEATHER_CORE_EXPIRY_COLOR = (255, 80, 50)
+FEATHER_CORE_DROP_SPEED = 70.0
 ZERO_TIME = 0.0
 FULL_WARNING_TINT = 1.0
 
@@ -55,9 +56,10 @@ class FeatherCore(GameObject):
         return self._lifetime
 
     def update(self, dt: float) -> None:
-        """Count down lifetime and deactivate uncollected expired pickups."""
+        """Fall toward the player while lifetime counts down."""
         self._lifetime -= dt
         self._pulse_timer += dt
+        self.y += FEATHER_CORE_DROP_SPEED * dt
         if self._lifetime <= ZERO_TIME and not self.collected:
             self.active = False
 

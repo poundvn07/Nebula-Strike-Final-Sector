@@ -1,8 +1,150 @@
-"""Resource manager placeholder."""
+"""Resource manager for Feather Core spending and Fever Mode tracking."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.entities.drone import Drone
+    from src.entities.player_ship import PlayerShip
+    from src.weapons.weapon import Weapon
+
+FEVER_STREAK_TRIGGER_COUNT = 10
+FEVER_DURATION_SECONDS = 5.0
+FEVER_DAMAGE_MULTIPLIER = 1.5
+NORMAL_DAMAGE_MULTIPLIER = 1.0
+REPAIR_FC_CHUNK = 10
+UPGRADE_LEVEL_ONE_COST = 25
+UPGRADE_LEVEL_TWO_COST = 50
+DRONE_SUMMON_COST = 15
+DRONE_UNLOCK_COST = 40
+LIFE_PURCHASE_COST = 50
+MAX_PURCHASED_LIVES = 5
+ZERO_TIME = 0.0
 
 
-# stub — will be implemented in Phase [X], Prompt [Y]
 class ResourceManager:
-    """Placeholder for Feather Core inventory and spending."""
+    """Tracks Feather Core streaks, Fever Mode, and FC spending interfaces."""
 
-    pass
+    def __init__(self) -> None:
+        """Initialize Fever Mode streak state and timer."""
+        self.streak_count = 0
+        self.last_hit_time = ZERO_TIME
+        self.fever_active = False
+        self.fever_timer = ZERO_TIME
+
+    def on_fc_collected(self) -> None:
+        """Increment FC pickup streak and reset the time since the last streak event."""
+        self.streak_count += 1
+        self.last_hit_time = ZERO_TIME
+        self.check_fever_trigger()
+
+    def on_player_hit(self) -> None:
+        """Break the FC pickup streak after the player takes damage."""
+        self.streak_count = 0
+        self.last_hit_time = ZERO_TIME
+
+    def check_fever_trigger(self) -> None:
+        """Activate Fever Mode once the FC pickup streak reaches 10."""
+        if self.streak_count >= FEVER_STREAK_TRIGGER_COUNT and not self.fever_active:
+            self.fever_active = True
+            self.fever_timer = FEVER_DURATION_SECONDS
+
+    def update(self, dt: float) -> None:
+        """Tick Fever Mode and deactivate it when the 5 second duration expires."""
+        self.last_hit_time += dt
+        if not self.fever_active:
+            return
+
+        self.fever_timer = max(ZERO_TIME, self.fever_timer - dt)
+        if self.fever_timer <= ZERO_TIME:
+            self.fever_active = False
+
+    def get_damage_multiplier(self) -> float:
+        """Return the active Fever Mode damage multiplier."""
+        return FEVER_DAMAGE_MULTIPLIER if self.fever_active else NORMAL_DAMAGE_MULTIPLIER
+
+    def repair_ship(self, player: PlayerShip, fc_amount: int) -> int:
+        """Spend 10 FC per 20 percent HP restored through the PlayerShip repair API."""
+        return int(player.repair(fc_amount))
+
+    def upgrade_weapon(self, player: PlayerShip, slot: int, weapon: Weapon | None = None) -> bool:
+        """Spend 25 or 50 FC, then upgrade the selected weapon."""
+        selected_weapon = weapon or player.weapon_slots[slot]
+        if selected_weapon is None:
+            return False
+
+        upgrade_cost = _get_weapon_upgrade_cost(selected_weapon)
+        if upgrade_cost <= 0:
+            return False
+        if not player.spend_fc(upgrade_cost):
+            return False
+
+        upgraded = bool(selected_weapon.upgrade())
+        if not upgraded:
+            player.add_fc(upgrade_cost)
+        return upgraded
+
+    def summon_drone(self, player: PlayerShip, drone_type: type[Drone]) -> Drone | None:
+        """Spend 15 FC, instantiate a drone, and add it to the player's drones."""
+        summon_method = getattr(player, "summon_drone", None)
+        if summon_method is not None:
+            return summon_method(drone_type)
+
+        if not player.spend_fc(DRONE_SUMMON_COST):
+            return None
+
+        drone = drone_type(player)
+        player.drones.append(drone)
+        return drone
+
+    def unlock_drone_type(self, player: PlayerShip, drone_type: type[Drone]) -> bool:
+        """Spend 40 FC and add the drone type to player.unlocked_drones."""
+        unlocked_drones = _ensure_unlocked_drones(player)
+        if drone_type in unlocked_drones:
+            return True
+
+        unlock_method = getattr(player, "unlock_drone", None)
+        if unlock_method is not None:
+            unlocked = bool(unlock_method(drone_type))
+            if unlocked:
+                unlocked_drones.add(drone_type)
+            return unlocked
+
+        if not player.spend_fc(DRONE_UNLOCK_COST):
+            return False
+
+        unlocked_drones.add(drone_type)
+        return True
+
+    def purchase_life(self, player: PlayerShip) -> bool:
+        """Spend FC to buy one extra life before a map starts."""
+        current_lives = int(getattr(player, "lives", 0))
+        if current_lives >= MAX_PURCHASED_LIVES:
+            return False
+        if not player.spend_fc(LIFE_PURCHASE_COST):
+            return False
+
+        player.lives = current_lives + 1
+        return True
+
+
+def _get_weapon_upgrade_cost(weapon: Weapon) -> int:
+    """Return the weapon's next upgrade cost."""
+    get_upgrade_cost = getattr(weapon, "get_upgrade_cost", None)
+    if get_upgrade_cost is not None:
+        return int(get_upgrade_cost())
+
+    upgrade_level = int(getattr(weapon, "upgrade_level", 1))
+    if upgrade_level == 1:
+        return UPGRADE_LEVEL_ONE_COST
+    if upgrade_level == 2:
+        return UPGRADE_LEVEL_TWO_COST
+    return 0
+
+
+def _ensure_unlocked_drones(player: PlayerShip) -> set[type[Drone]]:
+    """Return player.unlocked_drones, creating it when needed."""
+    if not hasattr(player, "unlocked_drones"):
+        player.unlocked_drones = set()
+    return player.unlocked_drones
