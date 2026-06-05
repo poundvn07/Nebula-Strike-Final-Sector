@@ -14,10 +14,17 @@ from src.core.scene_manager import SceneManager
 from src.entities.attack_drone import AttackDrone
 from src.entities.player_ship import PlayerShip
 from src.entities.shield_drone import ShieldDrone
-from src.systems.resource_manager import LIFE_PURCHASE_COST, MAX_PURCHASED_LIVES, ResourceManager
+from src.systems.resource_manager import (
+    LIFE_PURCHASE_COST,
+    MAX_PURCHASED_LIVES,
+    WEAPON_PURCHASE_COSTS,
+    ResourceManager,
+)
 from src.systems.save_manager import SaveManager
 from src.ui.result_screen import ResultScene
+from src.weapons.ice_bolt import IceBolt
 from src.weapons.laser_cannon import LaserCannon
+from src.weapons.missile_salvo import MissileSalvo
 from src.weapons.plasma_spread import PlasmaSpread
 
 
@@ -201,3 +208,29 @@ def test_resource_manager_can_purchase_life() -> None:
 
     assert ResourceManager().purchase_life(player) is False
     assert player.lives == MAX_PURCHASED_LIVES
+
+
+def test_resource_manager_weapon_shop_respects_map_gates() -> None:
+    """Ice unlocks before map 2 and can be bought into an empty slot."""
+    player = PlayerShip()
+    player.add_fc(WEAPON_PURCHASE_COSTS["ICE_BOLT"])
+    resource_manager = ResourceManager()
+
+    assert resource_manager.purchase_weapon(player, "ICE_BOLT", 1, current_map=1) is False
+    assert player.weapon_slots[1] is None
+    assert player.fc_inventory == WEAPON_PURCHASE_COSTS["ICE_BOLT"]
+
+    assert resource_manager.purchase_weapon(player, "ICE_BOLT", 1, current_map=2) is True
+    assert isinstance(player.weapon_slots[1], IceBolt)
+    assert player.fc_inventory == 0
+
+
+def test_resource_manager_weapon_shop_can_replace_equipped_slot() -> None:
+    """Map 3 shop can replace an equipped weapon with Missile Salvo."""
+    player = PlayerShip()
+    player.equip_weapon(LaserCannon(), 0)
+    player.add_fc(WEAPON_PURCHASE_COSTS["MISSILE_SALVO"])
+
+    assert ResourceManager().purchase_weapon(player, "MISSILE_SALVO", 0, current_map=3) is True
+    assert isinstance(player.weapon_slots[0], MissileSalvo)
+    assert player.fc_inventory == 0

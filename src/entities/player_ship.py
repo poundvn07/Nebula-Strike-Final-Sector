@@ -9,8 +9,12 @@ from typing import Mapping, Sequence
 import pygame
 
 from src.entities.bullet import Bullet, PLAYER_BULLET_OWNER
-from src.entities.drone import Drone  # TODO: implement in Phase X — use stub for now
+from src.entities.drone import Drone, DroneMode
+from src.entities.drone_manager import DroneManager
+from src.entities.feather_core import FeatherCore
 from src.entities.game_object import GameObject
+from src.enemies.enemy import Enemy
+from src.utils.assets import load_sprite, play_sound
 from src.utils.constants import MAX_ACTIVE_DRONES, MIN_HEALTH, SCREEN_HEIGHT, SCREEN_WIDTH
 from src.weapons.combo_effect import ComboEffect
 from src.weapons.weapon import DEFAULT_FIRE_DIRECTION, Direction, Weapon
@@ -29,6 +33,7 @@ PLAYER_REPAIR_FC_CHUNK = 10
 PLAYER_REPAIR_HP_PERCENT_PER_CHUNK = 0.20
 PLAYER_INITIAL_FC = 0
 PLAYER_INITIAL_SCORE = 0
+PLAYER_STARTING_LIVES = 3
 ZERO_MOVEMENT = 0.0
 PLAYER_COLOR = (80, 220, 255)
 MANUAL_FIRE_DIRECTION: Direction = DEFAULT_FIRE_DIRECTION
@@ -56,9 +61,13 @@ class PlayerShip(GameObject):
         self.speed = speed
         self.weapon_slots: list[Weapon | None] = [None for _ in range(PLAYER_WEAPON_SLOT_COUNT)]
         self.special_slot: Weapon | None = None
-        self.drones: list[Drone] = list(drones or [])[:MAX_ACTIVE_DRONES]
+        initial_drones = list(drones or [])[:MAX_ACTIVE_DRONES]
+        self.drone_manager = DroneManager(self, initial_drones)
+        self.drones: list[Drone] = self.drone_manager.drones
+        self.unlocked_drones: set[type[Drone]] = self.drone_manager.unlocked_drone_types
         self._fc_inventory = PLAYER_INITIAL_FC
         self.score = PLAYER_INITIAL_SCORE
+        self.lives = PLAYER_STARTING_LIVES
         self.aiming_mode = AimingMode.MANUAL
         self.auto_targets: list[GameObject] = []
         self.active_combo: ComboEffect | None = None
@@ -77,13 +86,63 @@ class PlayerShip(GameObject):
         if self.special_slot is not None:
             self.special_slot.update_cooldown(dt)
 
+    def update_drones(
+        self,
+        dt: float,
+        enemies: list[Enemy],
+        fc_items: list[FeatherCore],
+        enemy_bullets: list[Bullet] | None = None,
+    ) -> list[Bullet]:
+        """Update composed drones and return bullets emitted by drone behavior."""
+        drone_bullets = self.drone_manager.update(dt, enemies, fc_items, enemy_bullets)
+        self.drones = self.drone_manager.drones
+        return drone_bullets
+
     def render(self, surface: pygame.Surface) -> None:
-        """Draw the player as a rectangle until ship sprites are available."""
+        """Draw the player ship sprite, falling back to a rectangle."""
+        sprite = load_sprite("player_ship", (int(self.width), int(self.height)))
+        if sprite is not None:
+            surface.blit(sprite, self.get_rect())
+            return
         pygame.draw.rect(surface, PLAYER_COLOR, self.get_rect())
 
     def on_death(self) -> None:
         """Deactivate the ship when HP reaches zero."""
         self.active = False
+
+    def consume_life(self) -> bool:
+        """Spend one life for an in-map respawn, returning False on final death."""
+        if self.lives <= 1:
+            self.lives = MIN_HEALTH
+            return False
+
+        self.lives -= 1
+        return True
+
+    def respawn(self) -> None:
+        """Restore the ship after a life loss while preserving current run progress."""
+        self.hp = self.max_hp
+        self.active = True
+        self.x = PLAYER_START_X
+        self.y = PLAYER_START_Y
+
+    def reset_for_new_run(self) -> None:
+        """Reset run-owned player state after all lives have been lost."""
+        self.hp = self.max_hp
+        self.active = True
+        self.x = PLAYER_START_X
+        self.y = PLAYER_START_Y
+        self._fc_inventory = PLAYER_INITIAL_FC
+        self.score = PLAYER_INITIAL_SCORE
+        self.lives = PLAYER_STARTING_LIVES
+        self.weapon_slots = [None for _ in range(PLAYER_WEAPON_SLOT_COUNT)]
+        self.special_slot = None
+        self.drone_manager = DroneManager(self, [])
+        self.drones = self.drone_manager.drones
+        self.unlocked_drones = self.drone_manager.unlocked_drone_types
+        self.auto_targets = []
+        self.fc_streak_counter = PLAYER_INITIAL_FC
+        self.active_combo = None
 
     def move(self, keys_pressed: Mapping[int, bool] | Sequence[bool], dt: float) -> None:
         """Move with WASD or arrow keys and clamp the ship to screen bounds."""
@@ -120,6 +179,8 @@ class PlayerShip(GameObject):
             origin_x = self.x + self.width / PLAYER_CENTER_DIVISOR + muzzle_offsets[slot_index]
             origin_y = self.y
             fired_bullets = weapon.fire(origin_x, origin_y, self._get_fire_direction())
+            if fired_bullets:
+                play_sound("player_fire")
             for bullet in fired_bullets:
                 _mark_player_bullet(bullet)
             bullets.extend(fired_bullets)
@@ -197,6 +258,18 @@ class PlayerShip(GameObject):
             return True
         return False
 
+    def summon_drone(self, drone_type: type[Drone]) -> Drone | None:
+        """Summon one unlocked drone type by spending the drone summon FC cost."""
+        drone = self.drone_manager.summon_drone(drone_type)
+        self.drones = self.drone_manager.drones
+        return drone
+
+    def unlock_drone(self, drone_type: type[Drone]) -> bool:
+        """Unlock a drone type by spending its unlock FC cost."""
+        unlocked = self.drone_manager.unlock_drone(drone_type)
+        self.unlocked_drones = self.drone_manager.unlocked_drone_types
+        return unlocked
+
     def apply_debuff(self, debuff_type: str, duration: float) -> None:
         """Stub — player debuff effects not implemented yet (Phase 3)."""
         pass
@@ -205,6 +278,10 @@ class PlayerShip(GameObject):
         """Toggle between automatic nearest-target aiming and manual straight fire."""
         self.aiming_mode = AimingMode.AUTO if self.aiming_mode is AimingMode.MANUAL else AimingMode.MANUAL
         return self.aiming_mode
+
+    def toggle_drone_mode(self) -> DroneMode:
+        """Toggle all active drones between AUTO and FOLLOW mode."""
+        return self.drone_manager.toggle_mode()
 
     def set_auto_targets(self, enemies: Sequence[GameObject]) -> None:
         """Store enemies used by AUTO aiming and combo target selection."""

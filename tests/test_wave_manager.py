@@ -10,9 +10,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.core.game_scene import GameScene
+from src.enemies.armored_rooster import ArmoredRooster
+from src.enemies.kamikaze import KamikazeChicken
 from src.entities.player_ship import PlayerShip
 from src.systems.save_manager import SaveManager
 from src.systems.wave_manager import MAP_ONE_WAVE_ONE_ENEMY_COUNT, MAP_ONE_WAVE_ONE_SPAWN_Y, WaveManager
+from src.utils.constants import SCREEN_HEIGHT
 from src.weapons.laser_cannon import LaserCannon
 
 
@@ -69,6 +72,38 @@ def test_every_wave_has_at_least_two_enemy_rows() -> None:
     wave_manager.spawn_pending_now()
 
     assert len(wave_manager.enemies_alive) >= 10
+
+
+def test_special_enemies_keep_unique_movement_and_missed_dive_despawns() -> None:
+    """Kamikaze movement is not replaced by group formation and missed dives clear."""
+    wave_manager = WaveManager(1)
+    wave_manager.start_wave(2)
+    wave_manager.spawn_pending_now()
+    kamikaze = next(enemy for enemy in wave_manager.enemies_alive if isinstance(enemy, KamikazeChicken))
+    kamikaze.hp = 1
+    start_y = kamikaze.y
+
+    wave_manager.update(0.2)
+
+    assert getattr(kamikaze, "coordinated_formation_enemy", False) is False
+    assert kamikaze.y > start_y
+
+    kamikaze.x = -100
+    kamikaze.y = SCREEN_HEIGHT + 100
+    kamikaze.vy = 10.0
+    wave_manager.update(0.1)
+
+    assert kamikaze.active is False
+
+
+def test_armored_rooster_is_not_formation_overridden() -> None:
+    """ArmoredRooster keeps its patrol move instead of the shared formation sway."""
+    wave_manager = WaveManager(2)
+    wave_manager.start_wave(4)
+    wave_manager.spawn_pending_now()
+    armored = next(enemy for enemy in wave_manager.enemies_alive if isinstance(enemy, ArmoredRooster))
+
+    assert getattr(armored, "coordinated_formation_enemy", False) is False
 
 
 def test_game_scene_collects_enemy_bullets_once(save_path: Path) -> None:

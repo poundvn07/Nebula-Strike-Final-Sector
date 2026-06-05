@@ -15,6 +15,8 @@ from src.enemies.chicken_grunt import ChickenGrunt
 from src.enemies.dodge_hen import DODGE_HEN_HP, DodgeHen
 from src.enemies.kamikaze import KAMIKAZE_DIVE_SPEED, KamikazeChicken
 from src.entities.feather_core import FeatherCore
+from src.entities.player_ship import PlayerShip
+from src.systems.collision_system import CollisionSystem
 from src.weapons.weapon import WeaponType
 
 
@@ -66,6 +68,18 @@ def test_kamikaze_dive() -> None:
     assert enemy.vx > 0.0
     assert isclose(enemy.vy, 0.0, abs_tol=1e-6)
     assert isclose(enemy.vx, KAMIKAZE_DIVE_SPEED, rel_tol=1e-6)
+
+
+def test_kamikaze_body_collision_damages_player_and_self_destructs() -> None:
+    """KamikazeChicken resolves ramming contact instead of passing through."""
+    player = PlayerShip()
+    enemy = KamikazeChicken(player.x, player.y)
+
+    CollisionSystem().check_all(player, [], [enemy], [])
+
+    assert player.hp == player.max_hp - enemy.collision_damage
+    assert enemy.active is False
+    assert enemy.hp == 0
 
 
 def test_enemy_on_death_drops() -> None:

@@ -12,11 +12,14 @@ import pygame
 from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
 from src.entities.feather_core import FeatherCore
 from src.entities.game_object import GameObject
+from src.utils.assets import load_enemy_sprite, play_sound
 from src.utils.constants import MIN_HEALTH
 
 FormationOffset: TypeAlias = tuple[float, float]
 
 READY_ATTACK_COOLDOWN_SECONDS = 0.0
+DEFAULT_ATTACK_COOLDOWN_SCALE = 1.0
+MIN_SCALED_ATTACK_COOLDOWN_SECONDS = 0.25
 DEFAULT_ENEMY_COLOR = (255, 255, 255)
 DEFAULT_FORMATION_OFFSET: FormationOffset = (0.0, 0.0)
 FORMATION_PATTERN_COUNT = 3
@@ -79,12 +82,17 @@ class Enemy(GameObject):
     def update(self, dt: float) -> None:
         """Advance enemy behavior by moving and storing emitted attacks."""
         self.update_debuffs(dt)
-        self.move(dt)
+        if not getattr(self, "stationary_wave_enemy", False):
+            self.move(dt)
         self.last_attack_bullets = self.attack(dt)
 
     def render(self, surface: pygame.Surface) -> None:
-        """Render a simple rectangle until sprite assets are implemented."""
-        pygame.draw.rect(surface, self.render_color, self.get_rect())
+        """Render this enemy with its selected sprite, falling back to a rectangle."""
+        sprite = load_enemy_sprite(self)
+        if sprite is None:
+            pygame.draw.rect(surface, self.render_color, self.get_rect())
+            return
+        surface.blit(sprite, self.get_rect())
 
     def take_damage(self, amount: int) -> list[FeatherCore]:
         """Apply damage and return death drops when health reaches zero."""
@@ -95,6 +103,8 @@ class Enemy(GameObject):
         if self.hp == MIN_HEALTH:
             self.active = False
             self.death_drops = self.on_death()
+            sound_key = "boss_explosion" if getattr(self, "health_bar_visible", False) else "enemy_explosion"
+            play_sound(sound_key)
             return self.death_drops
         return []
 
@@ -186,7 +196,9 @@ class Enemy(GameObject):
 
     def _start_attack_cooldown(self, cooldown_seconds: float) -> None:
         """Reset the enemy attack cooldown after a successful attack."""
-        self.attack_cooldown = cooldown_seconds
+        cooldown_scale = float(getattr(self, "attack_cooldown_scale", DEFAULT_ATTACK_COOLDOWN_SCALE))
+        scaled_cooldown = cooldown_seconds * cooldown_scale
+        self.attack_cooldown = max(MIN_SCALED_ATTACK_COOLDOWN_SECONDS, scaled_cooldown)
 
     def _move_in_formation(self, dt: float, wave_num: int, speed: float) -> None:
         """Apply shared V, grid, or spiral formation movement based on wave number."""

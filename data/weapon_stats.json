@@ -1,4 +1,11 @@
 {
+  "starting_loadout": {
+    "weapon_slots": [
+      { "type": "LASER_CANNON", "level": 1 },
+      null
+    ],
+    "special_slot": null
+  },
   "laser_cannon": {
     "levels": {
       "1": { "damage": 10, "cooldown": 0.35, "upgrade_cost": 0 },

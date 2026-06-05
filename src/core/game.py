@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Protocol
-
 import pygame
 
+from src.core.scene_manager import Scene
 from src.utils.constants import (
     BACKGROUND_COLOR,
     FPS,
@@ -14,19 +13,6 @@ from src.utils.constants import (
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
 )
-
-
-class Scene(Protocol):
-    """Protocol for scenes that can be managed by the main game loop."""
-
-    def handle_event(self, event: pygame.event.Event) -> None:
-        """Handle a pygame event."""
-
-    def update(self, dt: float) -> None:
-        """Advance scene state by delta time."""
-
-    def render(self, surface: pygame.Surface) -> None:
-        """Draw the scene to the provided surface."""
 
 
 class Game:

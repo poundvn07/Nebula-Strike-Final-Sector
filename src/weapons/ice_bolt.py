@@ -8,7 +8,7 @@ from src.weapons.weapon import Direction, SkillEffect, Weapon, WeaponType
 
 ICE_NAME = "Ice Bolt"
 ICE_COOLDOWN_SECONDS = 0.5
-ICE_PROJECTILE_SPEED = 360.0
+ICE_PROJECTILE_SPEED = 300.0
 ICE_SLOW_DEBUFF = "SLOWED"
 ICE_SLOW_DURATION_SECONDS = 2.0
 ICE_SLOW_MULTIPLIER = 0.5

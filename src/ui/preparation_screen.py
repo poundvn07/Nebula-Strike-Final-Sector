@@ -9,7 +9,14 @@ import pygame
 
 from src.core.game_scene import GameScene
 from src.core.scene_manager import Scene, SceneManager
-from src.systems.resource_manager import DRONE_SUMMON_COST, DRONE_UNLOCK_COST, LIFE_PURCHASE_COST, REPAIR_FC_CHUNK, ResourceManager
+from src.systems.resource_manager import (
+    DRONE_SUMMON_COST,
+    DRONE_UNLOCK_COST,
+    LIFE_PURCHASE_COST,
+    REPAIR_FC_CHUNK,
+    ResourceManager,
+    WEAPON_SHOP_TYPES,
+)
 from src.systems.save_manager import DRONE_TYPES, SaveManager
 from src.utils.constants import SCREEN_WIDTH
 
@@ -27,28 +34,37 @@ PREP_BUTTON_DISABLED_COLOR = (54, 58, 70)
 PREP_BUTTON_TEXT_COLOR = (255, 255, 255)
 PREP_HP_BACK_COLOR = (60, 26, 34)
 PREP_HP_FILL_COLOR = (80, 220, 130)
-PREP_FONT_SIZE = 22
-PREP_SMALL_FONT_SIZE = 20
-PREP_TITLE_FONT_SIZE = 42
+PREP_FONT_SIZE = 20
+PREP_SMALL_FONT_SIZE = 17
+PREP_TITLE_FONT_SIZE = 40
 PREP_CENTER_X = SCREEN_WIDTH // 2
-PREP_TITLE_Y = 42
-SECTION_LEFT_X = 140
-SECTION_RIGHT_X = 430
-SECTION_WIDTH = 230
-BUTTON_WIDTH = 188
-BUTTON_HEIGHT = 34
+PREP_TITLE_Y = 38
+SECTION_LEFT_X = 56
+SECTION_RIGHT_X = 456
+SECTION_WIDTH = 288
+BUTTON_WIDTH = 176
+BUTTON_HEIGHT = 30
+SLOT_BUTTON_WIDTH = 44
+SLOT_BUTTON_GAP = 8
 HP_BAR_WIDTH = 300
 HP_BAR_HEIGHT = 18
 LINE_HEIGHT = 36
 BUTTON_GAP = 12
-STATUS_Y = 92
-SECTION_HEADING_Y = 184
-SECTION_BODY_Y = 224
-WEAPON_BUTTON_X = 130
+STATUS_Y = 84
+PROGRESSION_TIP_Y = 158
+SECTION_HEADING_Y = 180
+SECTION_BODY_Y = 208
+WEAPON_SLOT_SPACING = 64
+WEAPON_BUTTON_X = SECTION_LEFT_X + 20
+SHOP_HEADING_Y = 326
+SHOP_BODY_Y = 354
+SHOP_ROW_HEIGHT = 32
+SHOP_SLOT_ONE_X = SECTION_LEFT_X + 196
+SHOP_SLOT_TWO_X = SHOP_SLOT_ONE_X + SLOT_BUTTON_WIDTH + SLOT_BUTTON_GAP
 REPAIR_SECTION_Y = 430
-BEGIN_BUTTON_RECT = pygame.Rect(PREP_CENTER_X - 95, 520, 190, 42)
-REPAIR_BUTTON_RECT = pygame.Rect(SECTION_LEFT_X, REPAIR_SECTION_Y + 34, BUTTON_WIDTH, BUTTON_HEIGHT)
-LIFE_BUTTON_RECT = pygame.Rect(SECTION_LEFT_X, REPAIR_SECTION_Y + 76, BUTTON_WIDTH, BUTTON_HEIGHT)
+BEGIN_BUTTON_RECT = pygame.Rect(PREP_CENTER_X - 95, 548, 190, 38)
+REPAIR_BUTTON_RECT = pygame.Rect(SECTION_RIGHT_X, REPAIR_SECTION_Y + 28, BUTTON_WIDTH, BUTTON_HEIGHT)
+LIFE_BUTTON_RECT = pygame.Rect(SECTION_RIGHT_X, REPAIR_SECTION_Y + 64, BUTTON_WIDTH, BUTTON_HEIGHT)
 
 
 ButtonAction = Callable[[], bool]
@@ -99,7 +115,9 @@ class PreparationScene(Scene):
         self._buttons = []
         self._draw_title(surface)
         self._draw_ship_status(surface)
+        self._draw_progression_tip(surface)
         self._draw_weapon_section(surface)
+        self._draw_weapon_shop(surface)
         self._draw_drone_section(surface)
         self._draw_repair_section(surface)
         self._draw_begin_button(surface)
@@ -110,6 +128,10 @@ class PreparationScene(Scene):
         cost = int(button.get("cost", 0))
         label = str(button.get("label", ""))
         action = button.get("action")
+        if not bool(button.get("enabled", True)):
+            self.feedback_text = "Unavailable"
+            self.feedback_color = PREP_ERROR_COLOR
+            return
         if cost > self.player.fc_inventory:
             self.feedback_text = "Not enough FC"
             self.feedback_color = PREP_ERROR_COLOR
@@ -145,13 +167,24 @@ class PreparationScene(Scene):
         fc_text = font.render(f"FC: {self.player.fc_inventory}", True, PREP_TEXT_COLOR)
         _blit_centered(surface, fc_text, PREP_CENTER_X, STATUS_Y + 82)
 
+    def _draw_progression_tip(self, surface: pygame.Surface) -> None:
+        """Draw map-specific weapon guidance for upcoming enemy mechanics."""
+        current_map = int(self.game_state.get("current_map", 1))
+        if current_map == 2:
+            tip = "Map 2: Ice bypasses Armored Rooster armor"
+        elif current_map >= 3:
+            tip = "Map 3+: Missile AOE can damage Dodge Hen"
+        else:
+            tip = "Buy a second weapon before harder maps"
+        _blit_centered(surface, self._get_small_font().render(tip, True, PREP_MUTED_TEXT_COLOR), PREP_CENTER_X, PROGRESSION_TIP_Y)
+
     def _draw_weapon_section(self, surface: pygame.Surface) -> None:
         """Draw weapon slots and upgrade buttons."""
         font = self._get_font()
         heading = font.render("Weapons", True, PREP_TEXT_COLOR)
         _blit_centered(surface, heading, SECTION_LEFT_X + SECTION_WIDTH // 2, SECTION_HEADING_Y)
         for slot_index, weapon in enumerate(self.player.weapon_slots[:2]):
-            y = SECTION_BODY_Y + slot_index * 84
+            y = SECTION_BODY_Y + slot_index * WEAPON_SLOT_SPACING
             if weapon is None:
                 label = f"Slot {slot_index + 1}: Empty"
                 cost = 0
@@ -160,8 +193,38 @@ class PreparationScene(Scene):
                 cost = int(weapon.get_upgrade_cost())
             surface.blit(font.render(label, True, PREP_TEXT_COLOR), (SECTION_LEFT_X, y))
             if weapon is not None and cost > 0:
-                rect = pygame.Rect(WEAPON_BUTTON_X, y + 34, BUTTON_WIDTH, BUTTON_HEIGHT)
+                rect = pygame.Rect(WEAPON_BUTTON_X, y + 26, BUTTON_WIDTH, BUTTON_HEIGHT)
                 self._add_button(surface, rect, f"Upgrade ({cost} FC)", cost, lambda i=slot_index: self._upgrade_slot(i))
+
+    def _draw_weapon_shop(self, surface: pygame.Surface) -> None:
+        """Draw map-gated weapon purchase buttons for each weapon slot."""
+        font = self._get_font()
+        small_font = self._get_small_font()
+        current_map = int(self.game_state.get("current_map", 1))
+        surface.blit(font.render("Weapon Shop", True, PREP_TEXT_COLOR), (SECTION_LEFT_X, SHOP_HEADING_Y))
+        for row_index, item in enumerate(self.resource_manager.get_weapon_shop_items(current_map)):
+            y = SHOP_BODY_Y + row_index * SHOP_ROW_HEIGHT
+            unlocked = bool(item["unlocked"])
+            name = str(item["name"])
+            cost = int(item["cost"])
+            unlock_map = int(item["unlock_map"])
+            label = f"{name} ({cost} FC)" if unlocked else f"{name} - Map {unlock_map}"
+            color = PREP_TEXT_COLOR if unlocked else PREP_MUTED_TEXT_COLOR
+            surface.blit(small_font.render(label, True, color), (SECTION_LEFT_X, y + 7))
+            if not unlocked:
+                continue
+
+            weapon_key = str(item["key"])
+            for slot_index, x in enumerate((SHOP_SLOT_ONE_X, SHOP_SLOT_TWO_X)):
+                rect = pygame.Rect(x, y, SLOT_BUTTON_WIDTH, BUTTON_HEIGHT)
+                self._add_button(
+                    surface,
+                    rect,
+                    f"S{slot_index + 1}",
+                    cost,
+                    lambda key=weapon_key, i=slot_index: self._purchase_weapon(key, i),
+                    enabled=self._can_purchase_weapon_for_slot(weapon_key, slot_index),
+                )
 
     def _draw_drone_section(self, surface: pygame.Surface) -> None:
         """Draw active drone status, resummon buttons, and unlock buttons."""
@@ -196,7 +259,7 @@ class PreparationScene(Scene):
     def _draw_repair_section(self, surface: pygame.Surface) -> None:
         """Draw repair and life purchase controls."""
         font = self._get_font()
-        surface.blit(font.render("Repair / Lives", True, PREP_TEXT_COLOR), (SECTION_LEFT_X, REPAIR_SECTION_Y))
+        surface.blit(font.render("Repair / Lives", True, PREP_TEXT_COLOR), (SECTION_RIGHT_X, REPAIR_SECTION_Y))
         self._add_button(surface, REPAIR_BUTTON_RECT, "+20% HP (10 FC)", REPAIR_FC_CHUNK, self._repair_ship)
         self._add_button(surface, LIFE_BUTTON_RECT, f"+1 Life ({LIFE_PURCHASE_COST} FC)", LIFE_PURCHASE_COST, self._purchase_life)
 
@@ -209,7 +272,7 @@ class PreparationScene(Scene):
         if not self.feedback_text:
             return
         text = self._get_font().render(self.feedback_text, True, self.feedback_color)
-        _blit_centered(surface, text, PREP_CENTER_X, 492)
+        _blit_centered(surface, text, PREP_CENTER_X, 526)
 
     def _add_button(
         self,
@@ -218,14 +281,16 @@ class PreparationScene(Scene):
         label: str,
         cost: int,
         action: ButtonAction,
+        *,
+        enabled: bool = True,
     ) -> None:
         """Draw and register one button."""
-        can_afford = cost <= self.player.fc_inventory
+        can_afford = enabled and cost <= self.player.fc_inventory
         color = PREP_BUTTON_COLOR if can_afford else PREP_BUTTON_DISABLED_COLOR
         pygame.draw.rect(surface, color, rect)
         text = self._get_font().render(label, True, PREP_BUTTON_TEXT_COLOR)
         _blit_centered(surface, text, rect.centerx, rect.centery)
-        self._buttons.append({"rect": rect, "label": label, "cost": cost, "action": action})
+        self._buttons.append({"rect": rect, "label": label, "cost": cost, "action": action, "enabled": enabled})
 
     def _upgrade_slot(self, slot_index: int) -> bool:
         """Upgrade one weapon slot through ResourceManager."""
@@ -246,6 +311,21 @@ class PreparationScene(Scene):
     def _purchase_life(self) -> bool:
         """Buy one extra life through ResourceManager."""
         return self.resource_manager.purchase_life(self.player)
+
+    def _purchase_weapon(self, weapon_key: str, slot_index: int) -> bool:
+        """Buy a new weapon and equip or replace the selected slot."""
+        current_map = int(self.game_state.get("current_map", 1))
+        return self.resource_manager.purchase_weapon(self.player, weapon_key, slot_index, current_map)
+
+    def _can_purchase_weapon_for_slot(self, weapon_key: str, slot_index: int) -> bool:
+        """Return whether a shop button can change the selected weapon slot."""
+        if slot_index < 0 or slot_index >= len(self.player.weapon_slots):
+            return False
+        weapon = self.player.weapon_slots[slot_index]
+        if weapon is None:
+            return True
+        weapon_class = WEAPON_SHOP_TYPES.get(weapon_key)
+        return weapon_class is not None and not isinstance(weapon, weapon_class)
 
     def _begin_mission(self) -> bool:
         """Transition to GameScene for the current map."""
@@ -310,3 +390,7 @@ class PreparationScreen:
     def purchase_life(self, player: PlayerShip) -> bool:
         """Spend FC to buy one extra life."""
         return self.resource_manager.purchase_life(player)
+
+    def purchase_weapon(self, player: PlayerShip, weapon_key: str, slot: int, current_map: int) -> bool:
+        """Spend FC to equip a new weapon into a selected slot."""
+        return self.resource_manager.purchase_weapon(player, weapon_key, slot, current_map)

@@ -7,7 +7,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from src.entities.drone import Drone
     from src.entities.player_ship import PlayerShip
-    from src.weapons.weapon import Weapon
+
+from src.utils.constants import FINAL_MAP_INDEX, FIRST_MAP_INDEX, MIN_HEALTH
+from src.weapons.ice_bolt import IceBolt
+from src.weapons.laser_cannon import LaserCannon
+from src.weapons.missile_salvo import MissileSalvo
+from src.weapons.plasma_spread import PlasmaSpread
+from src.weapons.thunder_rail import ThunderRail
+from src.weapons.weapon import Weapon
 
 FEVER_STREAK_TRIGGER_COUNT = 10
 FEVER_DURATION_SECONDS = 5.0
@@ -20,6 +27,28 @@ DRONE_SUMMON_COST = 15
 DRONE_UNLOCK_COST = 40
 LIFE_PURCHASE_COST = 50
 MAX_PURCHASED_LIVES = 5
+WEAPON_SHOP_ORDER = ("LASER_CANNON", "PLASMA_SPREAD", "ICE_BOLT", "MISSILE_SALVO", "THUNDER_RAIL")
+WEAPON_SHOP_TYPES: dict[str, type[Weapon]] = {
+    "LASER_CANNON": LaserCannon,
+    "PLASMA_SPREAD": PlasmaSpread,
+    "ICE_BOLT": IceBolt,
+    "MISSILE_SALVO": MissileSalvo,
+    "THUNDER_RAIL": ThunderRail,
+}
+WEAPON_PURCHASE_COSTS = {
+    "LASER_CANNON": 30,
+    "PLASMA_SPREAD": 45,
+    "ICE_BOLT": 40,
+    "MISSILE_SALVO": 55,
+    "THUNDER_RAIL": 70,
+}
+WEAPON_UNLOCK_MAPS = {
+    "LASER_CANNON": FIRST_MAP_INDEX,
+    "PLASMA_SPREAD": FIRST_MAP_INDEX,
+    "ICE_BOLT": 2,
+    "MISSILE_SALVO": 3,
+    "THUNDER_RAIL": 3,
+}
 ZERO_TIME = 0.0
 
 
@@ -128,6 +157,37 @@ class ResourceManager:
         player.lives = current_lives + 1
         return True
 
+    def get_weapon_shop_items(self, current_map: int) -> list[dict[str, object]]:
+        """Return weapon shop items with map-based unlock metadata."""
+        return get_weapon_shop_items(current_map)
+
+    def purchase_weapon(
+        self,
+        player: PlayerShip,
+        weapon_key: str,
+        slot_index: int,
+        current_map: int = FINAL_MAP_INDEX,
+    ) -> bool:
+        """Buy a weapon and equip it into the selected player slot."""
+        weapon_class = WEAPON_SHOP_TYPES.get(weapon_key)
+        if weapon_class is None:
+            return False
+        if slot_index < MIN_HEALTH or slot_index >= len(player.weapon_slots):
+            return False
+        if current_map < WEAPON_UNLOCK_MAPS.get(weapon_key, FINAL_MAP_INDEX):
+            return False
+
+        existing_weapon = player.weapon_slots[slot_index]
+        if existing_weapon is not None and isinstance(existing_weapon, weapon_class):
+            return False
+
+        cost = WEAPON_PURCHASE_COSTS[weapon_key]
+        if not player.spend_fc(cost):
+            return False
+
+        player.equip_weapon(weapon_class(), slot_index)
+        return True
+
 
 def _get_weapon_upgrade_cost(weapon: Weapon) -> int:
     """Return the weapon's next upgrade cost."""
@@ -148,3 +208,22 @@ def _ensure_unlocked_drones(player: PlayerShip) -> set[type[Drone]]:
     if not hasattr(player, "unlocked_drones"):
         player.unlocked_drones = set()
     return player.unlocked_drones
+
+
+def get_weapon_shop_items(current_map: int) -> list[dict[str, object]]:
+    """Build the map-gated weapon shop catalog for the preparation scene."""
+    items: list[dict[str, object]] = []
+    for weapon_key in WEAPON_SHOP_ORDER:
+        weapon_class = WEAPON_SHOP_TYPES[weapon_key]
+        unlock_map = WEAPON_UNLOCK_MAPS[weapon_key]
+        prototype = weapon_class()
+        items.append(
+            {
+                "key": weapon_key,
+                "name": prototype.name,
+                "cost": WEAPON_PURCHASE_COSTS[weapon_key],
+                "unlock_map": unlock_map,
+                "unlocked": current_map >= unlock_map,
+            }
+        )
+    return items

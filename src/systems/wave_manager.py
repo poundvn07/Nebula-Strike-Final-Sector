@@ -3,26 +3,31 @@
 from __future__ import annotations
 
 from json import load
+from math import sin
 from pathlib import Path
 from typing import Callable, TypeAlias
 
 from src.enemies.armored_rooster import ArmoredRooster
 from src.enemies.chicken_grunt import ChickenGrunt
-from src.enemies.chicken_overlord import ChickenOverlord  # TODO: implement in Phase X — use stub for now
+from src.enemies.chicken_overlord import ChickenOverlord
 from src.enemies.dodge_hen import DodgeHen
 from src.enemies.egg_bomber import EggBomber
 from src.enemies.enemy import Enemy, FormationOffset
 from src.enemies.kamikaze import KamikazeChicken
-from src.enemies.space_rooster import SpaceRooster  # TODO: implement in Phase X — use stub for now
-from src.utils.constants import FINAL_MAP_INDEX, FIRST_MAP_INDEX, MIN_HEALTH, SCREEN_WIDTH
+from src.enemies.space_rooster import SpaceRooster
+from src.utils.constants import FINAL_MAP_INDEX, FIRST_MAP_INDEX, MIN_HEALTH, SCREEN_HEIGHT, SCREEN_WIDTH
 
 SpawnEntry: TypeAlias = dict[str, object]
-EnemyFactory: TypeAlias = Callable[[float, float, int, FormationOffset], object]
+EnemyFactory: TypeAlias = Callable[[float, float, int, FormationOffset], Enemy]
 
 ENEMY_STATS_PATH = Path(__file__).resolve().parents[2] / "data" / "enemy_stats.json"
-SPAWN_Y = -50.0
+SPAWN_Y = 78.0
+MAP_ONE_WAVE_ONE_SPAWN_Y = 74.0
+MAP_ONE_WAVE_ONE_ROW_SPACING = 58.0
+MAP_ONE_WAVE_ONE_ENEMY_COUNT = 10
+MAP_ONE_WAVE_ONE_ATTACK_COOLDOWN_SCALE = 2.25
 BASE_SPAWN_DELAY_SECONDS = 0.0
-SPAWN_STAGGER_SECONDS = 0.35
+SPAWN_STAGGER_SECONDS = 0.0
 FORMATIONS_PER_ROW = 5
 FORMATION_CENTER_INDEX_OFFSET = 1
 FORMATION_CENTER_DIVISOR = 2.0
@@ -35,6 +40,7 @@ V_FORMATION_MAX_WAVE = 3
 GRID_FORMATION_MAX_WAVE = 6
 BASE_ENEMY_COUNT = 4
 ENEMY_COUNT_PER_WAVE = 1
+MIN_TWO_ROW_ENEMY_COUNT = FORMATIONS_PER_ROW * 2
 BASE_WAVE_REWARD = 25
 WAVE_REWARD_SCALE = 10
 MAP_REWARD_SCALE = 5
@@ -44,11 +50,14 @@ PERCENT_MAX = 100
 MAP_THREE_TIER_TWO_PERCENT = 35
 MAP_FOUR_TIER_TWO_PERCENT = 70
 MAP_FIVE_TIER_TWO_PERCENT = 50
-BOSS_PLACEHOLDER_WIDTH = 96
-BOSS_PLACEHOLDER_HEIGHT = 96
-BOSS_SCORE_VALUE = 1000
-BOSS_FC_DROP_MIN = 0
-BOSS_ACTIVE = True
+FORMATION_SWAY_X = 52.0
+FORMATION_SWAY_Y = 28.0
+FORMATION_SWAY_X_RATE = 1.25
+FORMATION_SWAY_Y_RATE = 0.85
+FORMATION_TOP_MARGIN = 42.0
+FORMATION_BOTTOM_RATIO = 0.48
+FORMATION_LEFT_MARGIN = 12.0
+FORMATION_RIGHT_MARGIN = 12.0
 
 CHICKEN_GRUNT_TYPE = "chicken_grunt"
 EGG_BOMBER_TYPE = "egg_bomber"
@@ -60,6 +69,7 @@ CHICKEN_OVERLORD_TYPE = "chicken_overlord"
 
 TIER_ONE_TYPES = (CHICKEN_GRUNT_TYPE, EGG_BOMBER_TYPE, KAMIKAZE_TYPE)
 TIER_TWO_TYPES = (ARMORED_ROOSTER_TYPE, DODGE_HEN_TYPE)
+FORMATION_ENEMY_TYPES = (CHICKEN_GRUNT_TYPE, EGG_BOMBER_TYPE)
 
 MAP_CONFIGS = {
     1: {
@@ -116,6 +126,7 @@ class WaveManager:
         self.spawn_queue: list[SpawnEntry] = []
         self.wave_complete = False
         self.map_complete = False
+        self.formation_time = BASE_SPAWN_DELAY_SECONDS
 
     def start_wave(self, wave_num: int) -> None:
         """Build the spawn queue for the requested wave number."""
@@ -128,6 +139,14 @@ class WaveManager:
         self.spawn_queue = self._build_spawn_queue(wave_num)
         self.wave_complete = False
         self.map_complete = False
+        self.formation_time = BASE_SPAWN_DELAY_SECONDS
+
+    def spawn_pending_now(self) -> None:
+        """Move every queued spawn into play so intro gating starts with a full wave."""
+        ready_entries = list(self.spawn_queue)
+        self.spawn_queue.clear()
+        for entry in ready_entries:
+            self.enemies_alive.append(self._spawn_enemy(entry))
 
     def update(self, dt: float) -> None:
         """Tick spawn timers and move ready enemies from the queue into play."""
@@ -147,7 +166,10 @@ class WaveManager:
         self.spawn_queue = pending_entries
         for entry in ready_entries:
             spawned_enemy = self._spawn_enemy(entry)
-            self.enemies_alive.append(spawned_enemy)  # type: ignore[arg-type]
+            self.enemies_alive.append(spawned_enemy)
+
+        self.formation_time += dt
+        self._update_alive_enemies(dt)
 
         self.wave_complete = self.is_wave_clear()
         self.map_complete = self.wave_complete and self.current_wave == int(self.map_config["waves"])
@@ -180,7 +202,10 @@ class WaveManager:
 
     def _get_enemy_types_for_wave(self, wave_num: int) -> list[str]:
         """Choose a deterministic enemy mix for this map and wave."""
-        enemy_count = BASE_ENEMY_COUNT + wave_num * ENEMY_COUNT_PER_WAVE
+        if self._is_map_one_wave_one(wave_num):
+            return [CHICKEN_GRUNT_TYPE for _ in range(MAP_ONE_WAVE_ONE_ENEMY_COUNT)]
+
+        enemy_count = max(MIN_TWO_ROW_ENEMY_COUNT, BASE_ENEMY_COUNT + wave_num * ENEMY_COUNT_PER_WAVE)
         allowed_types = tuple(self.map_config["allowed_types"])
         tier_two_percent = self._get_tier_two_percent(wave_num)
         enemy_types: list[str] = []
@@ -219,7 +244,10 @@ class WaveManager:
         base_x = self._get_base_spawn_x()
         formation_offset = self._get_formation_offset(spawn_index)
         spawn_x = base_x + formation_offset[0]
-        spawn_y = SPAWN_Y - formation_offset[1]
+        if self._is_map_one_wave_one(self.current_wave):
+            spawn_y = MAP_ONE_WAVE_ONE_SPAWN_Y + (spawn_index // FORMATIONS_PER_ROW) * MAP_ONE_WAVE_ONE_ROW_SPACING
+        else:
+            spawn_y = SPAWN_Y + (spawn_index // FORMATIONS_PER_ROW) * FORMATION_Y_SPACING
         return {
             "timer": BASE_SPAWN_DELAY_SECONDS + spawn_index * SPAWN_STAGGER_SECONDS,
             "enemy_type": enemy_type,
@@ -229,9 +257,10 @@ class WaveManager:
             "formation_offset": formation_offset,
             "formation_wave_arg": formation_wave_arg,
             "wave_num": self.current_wave,
+            "spawn_index": spawn_index,
         }
 
-    def _spawn_enemy(self, entry: SpawnEntry) -> object:
+    def _spawn_enemy(self, entry: SpawnEntry) -> Enemy:
         """Instantiate an enemy for a ready spawn queue entry."""
         enemy_type = str(entry["enemy_type"])
         factory = self._get_enemy_factory(enemy_type)
@@ -245,7 +274,17 @@ class WaveManager:
         enemy.map_number = self.map_number
         enemy.wave_num = self.current_wave
         enemy.spawn_x = float(entry["base_x"])
+        enemy.spawn_y = float(entry["y"])
+        enemy.formation_anchor_x = float(entry["x"])
+        enemy.formation_anchor_y = float(entry["y"])
         enemy.formation_offset = entry["formation_offset"]
+        enemy.coordinated_formation_enemy = (
+            enemy_type in FORMATION_ENEMY_TYPES
+            and not getattr(enemy, "health_bar_visible", False)
+        )
+        if self._is_map_one_wave_one(self.current_wave):
+            enemy.attack_cooldown_scale = MAP_ONE_WAVE_ONE_ATTACK_COOLDOWN_SCALE
+            enemy.attack_cooldown = 0.75 + (int(entry["spawn_index"]) % FORMATIONS_PER_ROW) * 0.18
         if "boss_phases" in entry:
             enemy.phase_count = int(entry["boss_phases"])
         return enemy
@@ -258,39 +297,13 @@ class WaveManager:
             KAMIKAZE_TYPE: lambda x, y, wave_num, offset: KamikazeChicken(x, y),
             ARMORED_ROOSTER_TYPE: lambda x, y, wave_num, offset: ArmoredRooster(x, y),
             DODGE_HEN_TYPE: lambda x, y, wave_num, offset: DodgeHen(x, y),
-            SPACE_ROOSTER_TYPE: lambda x, y, wave_num, offset: self._create_boss_stub(SpaceRooster, x, y, offset),
-            CHICKEN_OVERLORD_TYPE: lambda x, y, wave_num, offset: self._create_boss_stub(
-                ChickenOverlord,
-                x,
-                y,
-                offset,
-            ),
+            SPACE_ROOSTER_TYPE: lambda x, y, wave_num, offset: SpaceRooster(x, y),
+            CHICKEN_OVERLORD_TYPE: lambda x, y, wave_num, offset: ChickenOverlord(x, y),
         }
         return factories[enemy_type]
 
-    def _create_boss_stub(
-        self,
-        boss_class: type[SpaceRooster] | type[ChickenOverlord],
-        x: float,
-        y: float,
-        formation_offset: FormationOffset,
-    ) -> object:
-        """Create a configured boss placeholder until boss classes are implemented."""
-        boss = boss_class()
-        boss.x = x
-        boss.y = y
-        boss.width = BOSS_PLACEHOLDER_WIDTH
-        boss.height = BOSS_PLACEHOLDER_HEIGHT
-        boss.active = BOSS_ACTIVE
-        boss.formation_offset = formation_offset
-        boss.score_value = BOSS_SCORE_VALUE
-        boss.fc_drop_min = BOSS_FC_DROP_MIN
-        boss.fc_drop_max = BOSS_FC_DROP_MIN
-        boss.is_boss_placeholder = True
-        return boss
-
     def _apply_map_stats(self, enemy: object, enemy_type: str) -> None:
-        """Apply map-specific JSON stats to spawned enemies or boss placeholders."""
+        """Apply map-specific JSON stats to spawned enemies."""
         stats = self.enemy_config.get(enemy_type, {})
         hp = stats.get("hp")
         speed = stats.get("speed")
@@ -308,6 +321,71 @@ class WaveManager:
     def _prune_inactive_enemies(self) -> None:
         """Remove enemies that have been marked inactive by combat systems."""
         self.enemies_alive = [enemy for enemy in self.enemies_alive if getattr(enemy, "active", False)]
+
+    def _update_alive_enemies(self, dt: float) -> None:
+        """Update live enemies and enroll newly summoned boss minions."""
+        spawned_minions: list[Enemy] = []
+        for enemy in list(self.enemies_alive):
+            if not getattr(enemy, "active", False):
+                continue
+
+            if getattr(enemy, "coordinated_formation_enemy", False):
+                enemy.update_debuffs(dt)
+                self._move_enemy_in_coordinated_formation(enemy)
+                enemy.last_attack_bullets = enemy.attack(dt)
+            else:
+                if self._despawn_if_missed_dive(enemy):
+                    continue
+                enemy.update(dt)
+                if self._despawn_if_missed_dive(enemy):
+                    continue
+                self._clamp_enemy_to_screen(enemy)
+            if isinstance(enemy, ChickenOverlord):
+                spawned_minions.extend(enemy.newly_summoned_minions)
+                enemy.newly_summoned_minions = []
+
+        for minion in spawned_minions:
+            self._prepare_summoned_minion(minion)
+            self.enemies_alive.append(minion)
+
+    def _prepare_summoned_minion(self, minion: Enemy) -> None:
+        """Attach wave metadata so summoned minions enter the normal enemy lifecycle."""
+        minion.map_number = self.map_number
+        minion.wave_num = self.current_wave
+        minion.spawn_x = minion.x
+        minion.spawn_y = minion.y
+        minion.formation_anchor_x = minion.x
+        minion.formation_anchor_y = minion.y
+        minion.coordinated_formation_enemy = isinstance(minion, (ChickenGrunt, EggBomber))
+
+    def _move_enemy_in_coordinated_formation(self, enemy: Enemy) -> None:
+        """Move a regular enemy with the wave group, clamped inside the screen."""
+        anchor_x = float(getattr(enemy, "formation_anchor_x", enemy.x))
+        anchor_y = float(getattr(enemy, "formation_anchor_y", enemy.y))
+        x_offset = sin(self.formation_time * FORMATION_SWAY_X_RATE) * FORMATION_SWAY_X
+        y_offset = sin(self.formation_time * FORMATION_SWAY_Y_RATE) * FORMATION_SWAY_Y
+        max_x = SCREEN_WIDTH - FORMATION_RIGHT_MARGIN - enemy.width
+        max_y = SCREEN_HEIGHT * FORMATION_BOTTOM_RATIO
+        enemy.x = _clamp(anchor_x + x_offset, FORMATION_LEFT_MARGIN, max_x)
+        enemy.y = _clamp(anchor_y + y_offset, FORMATION_TOP_MARGIN, max_y)
+
+    def _clamp_enemy_to_screen(self, enemy: Enemy) -> None:
+        """Keep enemy-specific movement inside the visible play area."""
+        max_x = SCREEN_WIDTH - enemy.width
+        max_y = SCREEN_HEIGHT - enemy.height
+        enemy.x = _clamp(enemy.x, MIN_HEALTH, max_x)
+        enemy.y = _clamp(enemy.y, MIN_HEALTH, max_y)
+
+    def _despawn_if_missed_dive(self, enemy: Enemy) -> bool:
+        """Deactivate ramming enemies that dive past the bottom edge."""
+        if int(getattr(enemy, "collision_damage", MIN_HEALTH)) <= MIN_HEALTH:
+            return False
+        if enemy.y < SCREEN_HEIGHT:
+            return False
+
+        enemy.hp = MIN_HEALTH
+        enemy.active = False
+        return True
 
     def _get_formation_wave_arg(self, wave_num: int) -> int:
         """Convert wave ranges into the formation selector used by enemy movement."""
@@ -333,3 +411,12 @@ class WaveManager:
         with ENEMY_STATS_PATH.open("r", encoding="utf-8") as stats_file:
             all_stats = load(stats_file)
         return dict(all_stats[f"map_{map_number}"])
+
+    def _is_map_one_wave_one(self, wave_num: int) -> bool:
+        """Return whether the requested wave uses the opening encounter tuning."""
+        return self.map_number == FIRST_MAP_INDEX and wave_num == FIRST_MAP_INDEX
+
+
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+    """Clamp a formation coordinate into the visible combat region."""
+    return max(minimum, min(maximum, value))

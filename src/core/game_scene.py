@@ -93,6 +93,7 @@ class GameScene(Scene):
             self._respawn_invulnerable_timer = max(0.0, self._respawn_invulnerable_timer - dt)
 
         self._update_player(dt)
+        self._sync_enemy_threats()
         self.wave_manager.update(dt)
         self._collect_enemy_attack_bullets()
         self._fire_player_weapons(dt)
@@ -148,6 +149,23 @@ class GameScene(Scene):
             ]
             self.bullets.extend(emitted_bullets)
             enemy.last_attack_bullets = []
+
+    def _sync_enemy_threats(self) -> None:
+        """Provide current player state to enemies with reactive movement logic."""
+        player_bullets = [
+            bullet
+            for bullet in self.bullets
+            if getattr(bullet, "owner", None) == "player" and getattr(bullet, "active", True)
+        ]
+        player_center = (
+            self.player.x + self.player.width / 2,
+            self.player.y + self.player.height / 2,
+        )
+        for enemy in self.wave_manager.enemies_alive:
+            if hasattr(enemy, "incoming_bullets"):
+                enemy.incoming_bullets = player_bullets
+            if hasattr(enemy, "player_position"):
+                enemy.player_position = player_center
 
     def _fire_player_weapons(self, dt: float) -> None:
         """Fire ready player weapons only while the player holds Space."""

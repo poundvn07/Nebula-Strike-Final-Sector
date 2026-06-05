@@ -8,6 +8,7 @@ from src.entities.bullet import Bullet
 from src.entities.feather_core import FeatherCore
 from src.entities.player_ship import PlayerShip
 from src.enemies.enemy import Enemy
+from src.systems.resource_manager import ResourceManager
 from src.utils.constants import MIN_HEALTH
 
 FC_ITEM_DEFAULT_SIZE = 12
@@ -22,9 +23,10 @@ AOE_DIAMETER_MULTIPLIER = 2
 class CollisionSystem:
     """Coordinates pygame.Rect collisions across projectiles, enemies, and pickups."""
 
-    def __init__(self) -> None:
+    def __init__(self, resource_manager: ResourceManager | None = None) -> None:
         """Initialize collision tracking state."""
         self.fc_streak_counter = MIN_HEALTH
+        self.resource_manager = resource_manager
 
     def check_all(
         self,
@@ -41,10 +43,12 @@ class CollisionSystem:
 
             owner = _get_bullet_owner(bullet)
             if owner == PLAYER_OWNER:
+                self._apply_fever_visual_state(bullet)
                 self._check_player_bullet(player, bullet, enemies, fc_items)
             elif owner == ENEMY_OWNER:
                 self._check_enemy_bullet(player, bullet)
 
+        self._check_enemy_body_collisions(player, enemies)
         self._check_fc_pickups(player, fc_items)
 
     def _check_player_bullet(
@@ -65,7 +69,7 @@ class CollisionSystem:
                 continue
 
             was_alive = enemy.is_alive()
-            drops = bullet.on_hit(enemy)
+            drops = self._hit_enemy_with_player_bullet(bullet, enemy)
             if was_alive and not enemy.is_alive():
                 player.score += getattr(enemy, "score_value", MIN_HEALTH)
                 fc_items.extend(drops)
@@ -76,6 +80,26 @@ class CollisionSystem:
         """Apply enemy bullet damage to the player on collision."""
         if _get_bullet_collision_rect(bullet).colliderect(player.get_rect()):
             bullet.on_hit(player)
+            if self.resource_manager is not None:
+                self.resource_manager.on_player_hit()
+
+    def _check_enemy_body_collisions(self, player: PlayerShip, enemies: list[Enemy]) -> None:
+        """Apply contact damage for enemies that attack by ramming the player."""
+        player_rect = player.get_rect()
+        for enemy in enemies:
+            if not getattr(enemy, "active", True):
+                continue
+            collision_damage = int(getattr(enemy, "collision_damage", MIN_HEALTH))
+            if collision_damage <= MIN_HEALTH:
+                continue
+            if not player_rect.colliderect(enemy.get_rect()):
+                continue
+
+            player.take_damage(collision_damage)
+            enemy.hp = MIN_HEALTH
+            enemy.active = False
+            if self.resource_manager is not None:
+                self.resource_manager.on_player_hit()
 
     def _check_fc_pickups(self, player: PlayerShip, fc_items: list[FeatherCore]) -> None:
         """Collect Feather Cores that collide with the player's rectangle."""
@@ -89,6 +113,25 @@ class CollisionSystem:
             player.add_fc(_collect_fc_item(fc_item))
             self.fc_streak_counter += 1
             player.fc_streak_counter = self.fc_streak_counter
+            if self.resource_manager is not None:
+                self.resource_manager.on_fc_collected()
+
+    def _hit_enemy_with_player_bullet(self, bullet: Bullet, enemy: Enemy) -> list[object]:
+        """Apply Fever Mode damage multiplier while preserving the bullet's base damage."""
+        if self.resource_manager is None:
+            return bullet.on_hit(enemy)
+
+        original_damage = bullet.damage
+        bullet.damage = original_damage * self.resource_manager.get_damage_multiplier()
+        try:
+            return bullet.on_hit(enemy)
+        finally:
+            bullet.damage = original_damage
+
+    def _apply_fever_visual_state(self, bullet: Bullet) -> None:
+        """Mark player bullets for Fever Mode tinting while Fever is active."""
+        if self.resource_manager is not None:
+            bullet.fever_active = self.resource_manager.fever_active
 
 
 def _get_bullet_owner(bullet: Bullet) -> str:

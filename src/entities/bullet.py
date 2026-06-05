@@ -7,6 +7,7 @@ from typing import Literal, TYPE_CHECKING
 import pygame
 
 from src.entities.game_object import GameObject
+from src.utils.assets import load_sprite
 from src.utils.constants import MIN_HEALTH, SCREEN_HEIGHT, SCREEN_WIDTH
 
 if TYPE_CHECKING:
@@ -29,6 +30,7 @@ BULLET_POOL_DEFAULT_SIZE = 128
 CHAIN_DAMAGE_MULTIPLIER = 0.5
 PLAYER_BULLET_COLOR = (80, 220, 255)
 ENEMY_BULLET_COLOR = (255, 180, 80)
+FEVER_BULLET_COLOR = (255, 190, 40)
 
 
 class Bullet(GameObject):
@@ -123,6 +125,7 @@ class Bullet(GameObject):
         self.chain_count: int = chain_count
         self.combo_targets: list = []
         self.metadata: dict[str, object] = {}
+        self.fever_active = False
 
     def update(self, dt: float) -> None:
         """Move the bullet and deactivate it once it leaves the screen margin."""
@@ -137,8 +140,17 @@ class Bullet(GameObject):
             self.active = False
 
     def render(self, surface: pygame.Surface) -> None:
-        """Draw the bullet as a colored rectangle until sprites are available."""
-        color = PLAYER_BULLET_COLOR if self.owner == PLAYER_BULLET_OWNER else ENEMY_BULLET_COLOR
+        """Draw the bullet using projectile sprites, with color rectangles as fallback."""
+        sprite_key = "player_bullet" if self.owner == PLAYER_BULLET_OWNER else "enemy_bullet"
+        sprite = load_sprite(sprite_key, (int(self.width), int(self.height)))
+        if sprite is not None:
+            surface.blit(sprite, self.get_rect())
+            return
+
+        if self.owner == PLAYER_BULLET_OWNER and getattr(self, "fever_active", False):
+            color = FEVER_BULLET_COLOR
+        else:
+            color = PLAYER_BULLET_COLOR if self.owner == PLAYER_BULLET_OWNER else ENEMY_BULLET_COLOR
         pygame.draw.rect(surface, color, self.get_rect())
 
     def on_death(self) -> None:
