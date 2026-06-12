@@ -21,29 +21,30 @@ SpawnEntry: TypeAlias = dict[str, object]
 EnemyFactory: TypeAlias = Callable[[float, float, int, FormationOffset], Enemy]
 
 ENEMY_STATS_PATH = Path(__file__).resolve().parents[2] / "data" / "enemy_stats.json"
-SPAWN_Y = 78.0
-MAP_ONE_WAVE_ONE_SPAWN_Y = 74.0
-MAP_ONE_WAVE_ONE_ROW_SPACING = 58.0
-MAP_ONE_WAVE_ONE_ENEMY_COUNT = 10
-MAP_ONE_WAVE_ONE_ATTACK_COOLDOWN_SCALE = 2.25
+SPAWN_Y = 96.0
+MAP_ONE_WAVE_ONE_SPAWN_Y = 92.0
+MAP_ONE_WAVE_ONE_ROW_SPACING = 66.0
+MAP_ONE_WAVE_ONE_ENEMY_COUNT = 12
+MAP_ONE_WAVE_ONE_ATTACK_COOLDOWN_SCALE = 2.6
 BASE_SPAWN_DELAY_SECONDS = 0.0
 SPAWN_STAGGER_SECONDS = 0.0
-FORMATIONS_PER_ROW = 5
+FORMATIONS_PER_ROW = 6
 FORMATION_CENTER_INDEX_OFFSET = 1
 FORMATION_CENTER_DIVISOR = 2.0
-FORMATION_X_SPACING = 82.0
-FORMATION_Y_SPACING = 36.0
+FORMATION_X_SPACING = 96.0
+FORMATION_Y_SPACING = 44.0
 V_FORMATION_WAVE_ARG = 1
 GRID_FORMATION_WAVE_ARG = 0
 SPIRAL_FORMATION_WAVE_ARG = 2
 V_FORMATION_MAX_WAVE = 3
 GRID_FORMATION_MAX_WAVE = 6
-BASE_ENEMY_COUNT = 4
-ENEMY_COUNT_PER_WAVE = 1
+BASE_ENEMY_COUNT = 6
+ENEMY_COUNT_PER_WAVE = 2
+ENEMY_COUNT_PER_MAP = 2
 MIN_TWO_ROW_ENEMY_COUNT = FORMATIONS_PER_ROW * 2
-BASE_WAVE_REWARD = 25
-WAVE_REWARD_SCALE = 10
-MAP_REWARD_SCALE = 5
+BASE_WAVE_REWARD = 10
+WAVE_REWARD_SCALE = 4
+MAP_REWARD_SCALE = 2
 TIER_TWO_START_WAVE = 4
 MAP_TWO_ARMORED_PERCENT = 20
 PERCENT_MAX = 100
@@ -55,9 +56,13 @@ FORMATION_SWAY_Y = 28.0
 FORMATION_SWAY_X_RATE = 1.25
 FORMATION_SWAY_Y_RATE = 0.85
 FORMATION_TOP_MARGIN = 42.0
-FORMATION_BOTTOM_RATIO = 0.48
+FORMATION_BOTTOM_RATIO = 0.55
 FORMATION_LEFT_MARGIN = 12.0
 FORMATION_RIGHT_MARGIN = 12.0
+BASE_ATTACK_COOLDOWN_SCALE = 1.45
+MAP_ATTACK_COOLDOWN_SCALE = 0.08
+WAVE_ATTACK_COOLDOWN_SCALE = 0.04
+MAX_ATTACK_COOLDOWN_SCALE = 2.25
 
 CHICKEN_GRUNT_TYPE = "chicken_grunt"
 EGG_BOMBER_TYPE = "egg_bomber"
@@ -205,7 +210,9 @@ class WaveManager:
         if self._is_map_one_wave_one(wave_num):
             return [CHICKEN_GRUNT_TYPE for _ in range(MAP_ONE_WAVE_ONE_ENEMY_COUNT)]
 
-        enemy_count = max(MIN_TWO_ROW_ENEMY_COUNT, BASE_ENEMY_COUNT + wave_num * ENEMY_COUNT_PER_WAVE)
+        map_bonus = (self.map_number - FIRST_MAP_INDEX) * ENEMY_COUNT_PER_MAP
+        raw_enemy_count = max(MIN_TWO_ROW_ENEMY_COUNT, BASE_ENEMY_COUNT + wave_num * ENEMY_COUNT_PER_WAVE + map_bonus)
+        enemy_count = _fill_grid_count(raw_enemy_count)
         allowed_types = tuple(self.map_config["allowed_types"])
         tier_two_percent = self._get_tier_two_percent(wave_num)
         enemy_types: list[str] = []
@@ -282,8 +289,13 @@ class WaveManager:
             enemy_type in FORMATION_ENEMY_TYPES
             and not getattr(enemy, "health_bar_visible", False)
         )
+        attack_cooldown_scale = self._get_attack_cooldown_scale()
         if self._is_map_one_wave_one(self.current_wave):
-            enemy.attack_cooldown_scale = MAP_ONE_WAVE_ONE_ATTACK_COOLDOWN_SCALE
+            attack_cooldown_scale = max(attack_cooldown_scale, MAP_ONE_WAVE_ONE_ATTACK_COOLDOWN_SCALE)
+        enemy.attack_cooldown_scale = attack_cooldown_scale
+        if float(getattr(enemy, "attack_cooldown", 0.0)) > BASE_SPAWN_DELAY_SECONDS:
+            enemy.attack_cooldown *= attack_cooldown_scale
+        if self._is_map_one_wave_one(self.current_wave):
             enemy.attack_cooldown = 0.75 + (int(entry["spawn_index"]) % FORMATIONS_PER_ROW) * 0.18
         if "boss_phases" in entry:
             enemy.phase_count = int(entry["boss_phases"])
@@ -406,6 +418,15 @@ class WaveManager:
         """Return the horizontal center used as the base spawn position."""
         return SCREEN_WIDTH / FORMATION_CENTER_DIVISOR
 
+    def _get_attack_cooldown_scale(self) -> float:
+        """Return the wave/map-based multiplier that spaces out enemy shots."""
+        scale = (
+            BASE_ATTACK_COOLDOWN_SCALE
+            + (self.map_number - FIRST_MAP_INDEX) * MAP_ATTACK_COOLDOWN_SCALE
+            + (self.current_wave - FIRST_MAP_INDEX) * WAVE_ATTACK_COOLDOWN_SCALE
+        )
+        return min(MAX_ATTACK_COOLDOWN_SCALE, scale)
+
     def _load_enemy_config(self, map_number: int) -> dict[str, dict[str, int | float]]:
         """Load map-specific enemy stats from the JSON data file."""
         with ENEMY_STATS_PATH.open("r", encoding="utf-8") as stats_file:
@@ -420,3 +441,11 @@ class WaveManager:
 def _clamp(value: float, minimum: float, maximum: float) -> float:
     """Clamp a formation coordinate into the visible combat region."""
     return max(minimum, min(maximum, value))
+
+
+def _fill_grid_count(enemy_count: int) -> int:
+    """Round enemy count up so the final formation row is fully populated."""
+    remainder = enemy_count % FORMATIONS_PER_ROW
+    if remainder == 0:
+        return enemy_count
+    return enemy_count + FORMATIONS_PER_ROW - remainder

@@ -9,15 +9,16 @@ from src.utils.constants import PLASMA_SPREAD_BASE_DAMAGE
 from src.weapons.weapon import Direction, MAX_WEAPON_LEVEL, SkillEffect, Weapon, WeaponType, normalize_direction
 
 PLASMA_NAME = "Plasma Spread"
+PLASMA_STATS_KEY = "plasma_spread"
 PLASMA_COOLDOWN_SECONDS = 0.55
 PLASMA_PROJECTILE_SPEED = 390.0
 PLASMA_DEFAULT_SHOT_COUNT = 3
-PLASMA_LEVEL_THREE_SHOT_COUNT = 5
+PLASMA_LEVEL_THREE_SHOT_COUNT = 3
 PLASMA_SPREAD_STEP_DEGREES = 15.0
 PLASMA_INDEX_OFFSET = 1
 PLASMA_CENTER_DIVISOR = 2.0
-PLASMA_NOVA_RADIUS = 140.0
-PLASMA_NOVA_DAMAGE_MULTIPLIER = 2.0
+PLASMA_NOVA_RADIUS = 110.0
+PLASMA_NOVA_DAMAGE_MULTIPLIER = 1.5
 
 
 class PlasmaSpread(Weapon):
@@ -30,10 +31,11 @@ class PlasmaSpread(Weapon):
             damage=PLASMA_SPREAD_BASE_DAMAGE,
             cooldown=PLASMA_COOLDOWN_SECONDS,
             weapon_type=WeaponType.PLASMA,
+            stats_key=PLASMA_STATS_KEY,
         )
 
     def fire(self, origin_x: float, origin_y: float, direction: Direction) -> list[Bullet]:
-        """Fire a 3-shot fan, expanding to 5 shots at level 3."""
+        """Fire a controlled 3-shot fan at every level."""
         if not self.can_fire():
             return []
 

@@ -13,7 +13,7 @@ from src.entities.game_object import GameObject
 if TYPE_CHECKING:
     from src.entities.player_ship import PlayerShip
 
-ATTACK_DRONE_ORBIT_RADIUS = 80
+ATTACK_DRONE_ORBIT_RADIUS = 96
 ATTACK_DRONE_RANGE = 300.0
 ATTACK_DRONE_FIRE_INTERVAL_SECONDS = 1.5
 ATTACK_DRONE_DAMAGE_MULTIPLIER = 0.60

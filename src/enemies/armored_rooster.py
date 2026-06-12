@@ -8,15 +8,15 @@ from src.enemies.enemy import Enemy
 from src.utils.constants import MIN_HEALTH
 from src.weapons.weapon import WeaponType
 
-ARMORED_ROOSTER_WIDTH = 52
-ARMORED_ROOSTER_HEIGHT = 48
+ARMORED_ROOSTER_WIDTH = 66
+ARMORED_ROOSTER_HEIGHT = 61
 ARMORED_ROOSTER_HP = 60
 ARMORED_ROOSTER_PATROL_SPEED = 45.0
 ARMORED_ROOSTER_SCORE_VALUE = 300
 ARMORED_ROOSTER_FC_DROP_MIN = 5
 ARMORED_ROOSTER_FC_DROP_MAX = 8
 ARMORED_ROOSTER_ARMOR_HITS = 3
-ARMORED_ROOSTER_ATTACK_INTERVAL_SECONDS = 3.0
+ARMORED_ROOSTER_ATTACK_INTERVAL_SECONDS = 4.0
 ARMORED_ROOSTER_LASER_SPEED = 180.0
 ARMORED_ROOSTER_LASER_DAMAGE = 14
 ARMORED_ROOSTER_LASER_WIDTH = 10
@@ -59,7 +59,7 @@ class ArmoredRooster(Enemy):
             self.vx = -self.vx
 
     def attack(self, dt: float) -> list[Bullet]:
-        """Overrides attack() to fire a laser beam every 3 seconds."""
+        """Overrides attack() to fire a laser beam on a spaced cooldown."""
         self._update_attack_cooldown(dt)
         if not self._can_attack():
             return []

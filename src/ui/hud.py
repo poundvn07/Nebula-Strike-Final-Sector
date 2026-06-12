@@ -12,12 +12,14 @@ from src.entities.attack_drone import AttackDrone
 from src.entities.bomb_drone import BombDrone
 from src.entities.shield_drone import ShieldDrone
 from src.entities.support_drone import SupportDrone
-from src.utils.constants import MAX_ACTIVE_DRONES, SCREEN_WIDTH
+from src.utils.constants import MAX_ACTIVE_DRONES, SCREEN_HEIGHT, SCREEN_WIDTH
 from src.weapons.combo_effect import ComboType
 
 HUD_TEXT_COLOR = (235, 244, 255)
 HUD_MUTED_COLOR = (145, 155, 175)
 HUD_PANEL_COLOR = (8, 12, 24)
+HUD_ACTIVE_PANEL_COLOR = (18, 42, 72)
+HUD_ACTIVE_BORDER_COLOR = (120, 205, 255)
 HUD_BAR_BACK_COLOR = (38, 42, 54)
 HUD_HP_GREEN = (60, 220, 100)
 HUD_HP_YELLOW = (245, 210, 60)
@@ -39,25 +41,26 @@ ALERT_FONT_SIZE = 56
 BOSS_FONT_SIZE = 24
 TOP_MARGIN = 14
 LEFT_MARGIN = 16
-RIGHT_X = 640
-HP_BAR_RECT = pygame.Rect(16, 18, 190, 18)
-HP_TEXT_POSITION = (16, 40)
-LIVES_POSITION = (16, 62)
+RIGHT_X = SCREEN_WIDTH - 238
+HP_BAR_RECT = pygame.Rect(18, 18, 230, 18)
+HP_TEXT_POSITION = (18, 42)
+LIVES_POSITION = (18, 66)
 FC_POSITION = (RIGHT_X, 18)
 SCORE_POSITION = (RIGHT_X, 42)
 WAVE_POSITION = (RIGHT_X, 66)
 WEAPON_SLOT_RECTS = (
-    pygame.Rect(16, 478, 250, 42),
-    pygame.Rect(16, 526, 250, 42),
+    pygame.Rect(18, SCREEN_HEIGHT - 158, 260, 38),
+    pygame.Rect(18, SCREEN_HEIGHT - 112, 260, 38),
+    pygame.Rect(18, SCREEN_HEIGHT - 66, 260, 38),
 )
-SPECIAL_SLOT_RECT = pygame.Rect(280, 526, 220, 42)
-DRONE_START_X = 680
-DRONE_Y = 532
+SPECIAL_SLOT_RECT = pygame.Rect(SCREEN_WIDTH - 278, SCREEN_HEIGHT - 64, 260, 40)
+DRONE_START_X = SCREEN_WIDTH - 134
+DRONE_Y = SCREEN_HEIGHT - 96
 DRONE_SPACING = 36
 DRONE_RADIUS = 13
-BOSS_BAR_RECT = pygame.Rect(220, 26, 360, 16)
-BOSS_NAME_POSITION = (220, 6)
-CENTER_ALERT_Y = 248
+BOSS_BAR_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 220, 26, 440, 16)
+BOSS_NAME_POSITION = (SCREEN_WIDTH // 2 - 220, 6)
+CENTER_ALERT_Y = SCREEN_HEIGHT // 2 - 72
 ALERT_DURATION_SECONDS = 3.0
 FEVER_FLASH_INTERVAL_SECONDS = 0.2
 STAR_FILLED = "★"
@@ -215,9 +218,10 @@ class HUD:
     def _draw_weapon_slots(self, surface: pygame.Surface, player: object) -> None:
         """Draw bottom-left weapon slots and special skill slot."""
         weapon_slots = list(getattr(player, "weapon_slots", []))
+        active_slot = int(getattr(player, "active_weapon_slot", 0))
         for slot_index, rect in enumerate(WEAPON_SLOT_RECTS):
             weapon = weapon_slots[slot_index] if slot_index < len(weapon_slots) else None
-            self._draw_weapon_slot(surface, rect, weapon, f"Weapon {slot_index + 1}")
+            self._draw_weapon_slot(surface, rect, weapon, f"Weapon {slot_index + 1}", active=slot_index == active_slot)
         self._draw_special_slot(surface, SPECIAL_SLOT_RECT, getattr(player, "special_slot", None))
 
     def _draw_weapon_slot(
@@ -226,16 +230,22 @@ class HUD:
         rect: pygame.Rect,
         weapon: object | None,
         empty_label: str,
+        *,
+        active: bool = False,
     ) -> None:
         """Draw one weapon slot with stars and cooldown overlay."""
-        pygame.draw.rect(surface, HUD_PANEL_COLOR, rect)
+        pygame.draw.rect(surface, HUD_ACTIVE_PANEL_COLOR if active else HUD_PANEL_COLOR, rect)
+        if active:
+            pygame.draw.rect(surface, HUD_ACTIVE_BORDER_COLOR, rect, 2)
         if weapon is None:
-            self._draw_text(surface, f"{empty_label}: Empty", (rect.x + 8, rect.y + 10), small=True)
+            prefix = "ACTIVE " if active else ""
+            self._draw_text(surface, f"{prefix}{empty_label}: Empty", (rect.x + 8, rect.y + 9), small=True)
             return
 
         level = int(getattr(weapon, "upgrade_level", 1))
         name = str(getattr(weapon, "name", empty_label))
-        self._draw_text(surface, f"{name} {_stars(level)}", (rect.x + 8, rect.y + 8), small=True)
+        prefix = "ACTIVE " if active else ""
+        self._draw_text(surface, f"{prefix}{name} {_stars(level)}", (rect.x + 8, rect.y + 7), small=True)
         self._draw_cooldown_pie(surface, rect, weapon)
 
     def _draw_special_slot(self, surface: pygame.Surface, rect: pygame.Rect, special: object | None) -> None:

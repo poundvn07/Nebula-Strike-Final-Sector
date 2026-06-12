@@ -10,8 +10,8 @@ from src.enemies.chicken_grunt import ChickenGrunt
 from src.enemies.enemy import Enemy
 from src.utils.constants import SCREEN_WIDTH
 
-CHICKEN_OVERLORD_WIDTH = 112
-CHICKEN_OVERLORD_HEIGHT = 120
+CHICKEN_OVERLORD_WIDTH = 143
+CHICKEN_OVERLORD_HEIGHT = 154
 CHICKEN_OVERLORD_HP = 900
 CHICKEN_OVERLORD_SPEED = 26.0
 CHICKEN_OVERLORD_SCORE_VALUE = 2500
@@ -20,11 +20,11 @@ CHICKEN_OVERLORD_FC_DROP_MAX = 50
 CHICKEN_OVERLORD_MAX_MINIONS = 4
 CHICKEN_OVERLORD_HEAL_PER_MINION_ALIVE = 2.0
 CHICKEN_OVERLORD_SUMMON_INTERVAL_SECONDS = 30.0
-CHICKEN_OVERLORD_ATTACK_INTERVAL_SECONDS = 2.0
-CHICKEN_OVERLORD_SPREAD_SPEED = 160.0
-CHICKEN_OVERLORD_SPREAD_SIDE_VX = 85.0
+CHICKEN_OVERLORD_ATTACK_INTERVAL_SECONDS = 2.6
+CHICKEN_OVERLORD_SPREAD_SPEED = 135.0
+CHICKEN_OVERLORD_SPREAD_SIDE_VX = 72.0
 CHICKEN_OVERLORD_SPREAD_DAMAGE = 14
-CHICKEN_OVERLORD_BEAM_SPEED = 240.0
+CHICKEN_OVERLORD_BEAM_SPEED = 205.0
 CHICKEN_OVERLORD_BEAM_DAMAGE = 22
 CHICKEN_OVERLORD_BEAM_WIDTH = 20
 CHICKEN_OVERLORD_BEAM_HEIGHT = 78
@@ -135,8 +135,8 @@ class ChickenOverlord(Enemy):
             self.minions_alive.remove(minion)
 
     def on_death(self) -> list[FeatherCore]:
-        """Override on_death() to drop 30-50 Feather Cores."""
-        drop_count = randint(CHICKEN_OVERLORD_FC_DROP_MIN, CHICKEN_OVERLORD_FC_DROP_MAX)
+        """Override on_death() to drop configured Feather Cores."""
+        drop_count = randint(int(self.fc_drop_min), int(self.fc_drop_max))
         return [self._create_feather_core(drop_index) for drop_index in range(drop_count)]
 
     def _current_base_speed(self) -> float:

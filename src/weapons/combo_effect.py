@@ -8,7 +8,8 @@ from typing import Sequence
 from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
 from src.weapons.weapon import MAX_WEAPON_LEVEL, WeaponType
 
-ION_BEAM_AOE_RADIUS = 40
+ION_BEAM_AOE_RADIUS = 16
+ION_BEAM_DAMAGE_MULTIPLIER = 0.65
 CRYO_BURST_AOE_RADIUS = 80
 CRYO_BURST_SLOW_SECONDS = 3.0
 CRYO_BURST_FREEZE_SECONDS = 1.0
@@ -85,6 +86,7 @@ class ComboEffect:
         bullet.is_piercing = True
         bullet.is_aoe = True
         bullet.aoe_radius = ION_BEAM_AOE_RADIUS
+        bullet.damage *= ION_BEAM_DAMAGE_MULTIPLIER
 
     def _apply_cryo_burst(self, bullet: Bullet) -> None:
         """Add freeze AOE behavior for Plasma plus Ice."""

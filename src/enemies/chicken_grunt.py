@@ -6,14 +6,14 @@ from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stu
 from src.entities.feather_core import FeatherCore
 from src.enemies.enemy import Enemy, FormationOffset
 
-CHICKEN_GRUNT_WIDTH = 36
-CHICKEN_GRUNT_HEIGHT = 34
+CHICKEN_GRUNT_WIDTH = 46
+CHICKEN_GRUNT_HEIGHT = 44
 CHICKEN_GRUNT_HP = 20
 CHICKEN_GRUNT_SPEED = 80.0
 CHICKEN_GRUNT_SCORE_VALUE = 100
 CHICKEN_GRUNT_FC_DROP_MIN = 1
 CHICKEN_GRUNT_FC_DROP_MAX = 2
-CHICKEN_GRUNT_ATTACK_INTERVAL_SECONDS = 2.0
+CHICKEN_GRUNT_ATTACK_INTERVAL_SECONDS = 2.4
 CHICKEN_GRUNT_EGG_SPEED = 100.0
 CHICKEN_GRUNT_EGG_DAMAGE = 8
 CHICKEN_GRUNT_EGG_VX = 0.0
@@ -51,7 +51,7 @@ class ChickenGrunt(Enemy):
         self._move_in_formation(dt=dt, wave_num=self.wave_num, speed=CHICKEN_GRUNT_SPEED)
 
     def attack(self, dt: float) -> list[Bullet]:
-        """Overrides attack() to drop one egg straight down every 2 seconds."""
+        """Overrides attack() to drop one egg straight down on a spaced cooldown."""
         self._update_attack_cooldown(dt)
         if not self._can_attack():
             return []

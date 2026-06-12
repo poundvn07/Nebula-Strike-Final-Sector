@@ -9,7 +9,7 @@ from typing import Any
 from src.entities.attack_drone import AttackDrone
 from src.entities.bomb_drone import BombDrone
 from src.entities.drone import Drone
-from src.entities.player_ship import PlayerShip
+from src.entities.player_ship import PLAYER_WEAPON_SLOT_COUNT, PlayerShip
 from src.entities.shield_drone import ShieldDrone
 from src.entities.support_drone import SupportDrone
 from src.utils.constants import FIRST_MAP_INDEX, MAP_COUNT, MIN_HEALTH
@@ -28,10 +28,11 @@ DEFAULT_FC_INVENTORY = 0
 DEFAULT_LIVES = 3
 DEFAULT_MAP_UNLOCKED = [True, False, False, False, False]
 SHIP_FULL_HP_PERCENT = 100.0
-WEAPON_SLOT_COUNT = 2
+WEAPON_SLOT_COUNT = PLAYER_WEAPON_SLOT_COUNT
 DEFAULT_STARTING_LOADOUT = {
-    "weapon_slots": [{"type": "LASER_CANNON", "level": MIN_WEAPON_LEVEL}, None],
+    "weapon_slots": [{"type": "LASER_CANNON", "level": MIN_WEAPON_LEVEL}, None, None],
     "special_slot": None,
+    "active_weapon_slot": 0,
 }
 
 WEAPON_TYPES: dict[str, type[Weapon]] = {
@@ -94,6 +95,8 @@ class SaveManager:
             player.weapon_slots.append(None)
 
         player.special_slot = _deserialize_weapon(data.get("special_slot"))
+        player.select_weapon_slot(_clamp_slot_index(data.get("active_weapon_slot", 0)))
+        player.get_active_combo()
 
         unlocked_drone_types = {
             drone_type
@@ -120,6 +123,7 @@ class SaveManager:
         for slot_index, weapon_data in enumerate(weapon_slots):
             player.equip_weapon(_deserialize_weapon(weapon_data), slot_index)
         player.special_slot = _deserialize_weapon(loadout.get("special_slot"))
+        player.select_weapon_slot(_clamp_slot_index(loadout.get("active_weapon_slot", 0)))
 
     def delete_save(self) -> None:
         """Remove the save file for the New Game option."""
@@ -162,6 +166,7 @@ class SaveManager:
             ),
             "weapon_slots": [_serialize_weapon(weapon) for weapon in player.weapon_slots[:WEAPON_SLOT_COUNT]],
             "special_slot": _serialize_weapon(player.special_slot),
+            "active_weapon_slot": _clamp_slot_index(getattr(player, "active_weapon_slot", 0)),
             "drones_active": [_serialize_drone(drone) for drone in player.drones],
             "unlocked_drone_types": [
                 _drone_type_name(drone_type)
@@ -256,3 +261,12 @@ def _normalize_map_unlocked(map_unlocked: object) -> list[bool]:
         normalized.append(False)
     normalized[0] = True
     return normalized
+
+
+def _clamp_slot_index(value: object) -> int:
+    """Return a valid weapon slot index for saved or configured data."""
+    try:
+        slot_index = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(WEAPON_SLOT_COUNT - 1, slot_index))

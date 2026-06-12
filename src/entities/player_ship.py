@@ -1,8 +1,7 @@
-"""Player ship entity with weapons, resources, and aiming modes."""
+"""Player ship entity with weapons, resources, and drones."""
 
 from __future__ import annotations
 
-from enum import Enum
 from math import ceil, hypot
 from typing import Mapping, Sequence
 
@@ -19,15 +18,15 @@ from src.utils.constants import MAX_ACTIVE_DRONES, MIN_HEALTH, SCREEN_HEIGHT, SC
 from src.weapons.combo_effect import ComboEffect
 from src.weapons.weapon import DEFAULT_FIRE_DIRECTION, Direction, Weapon
 
-PLAYER_WIDTH = 42
-PLAYER_HEIGHT = 46
+PLAYER_WIDTH = 54
+PLAYER_HEIGHT = 59
 PLAYER_MAX_HP = 100
 PLAYER_SPEED = 260.0
 PLAYER_START_X = SCREEN_WIDTH / 2 - PLAYER_WIDTH / 2
 PLAYER_START_Y = SCREEN_HEIGHT - PLAYER_HEIGHT * 2
-PLAYER_WEAPON_SLOT_COUNT = 2
-PLAYER_LEFT_MUZZLE_OFFSET = -10.0
-PLAYER_RIGHT_MUZZLE_OFFSET = 10.0
+PLAYER_WEAPON_SLOT_COUNT = 3
+PLAYER_MUZZLE_OFFSETS = (-16.0, 0.0, 16.0)
+PLAYER_DEFAULT_ACTIVE_WEAPON_SLOT = 0
 PLAYER_CENTER_DIVISOR = 2.0
 PLAYER_REPAIR_FC_CHUNK = 10
 PLAYER_REPAIR_HP_PERCENT_PER_CHUNK = 0.20
@@ -37,13 +36,6 @@ PLAYER_STARTING_LIVES = 3
 ZERO_MOVEMENT = 0.0
 PLAYER_COLOR = (80, 220, 255)
 MANUAL_FIRE_DIRECTION: Direction = DEFAULT_FIRE_DIRECTION
-
-
-class AimingMode(Enum):
-    """Enum describing player fire direction selection."""
-
-    AUTO = "AUTO"
-    MANUAL = "MANUAL"
 
 
 class PlayerShip(GameObject):
@@ -68,7 +60,7 @@ class PlayerShip(GameObject):
         self._fc_inventory = PLAYER_INITIAL_FC
         self.score = PLAYER_INITIAL_SCORE
         self.lives = PLAYER_STARTING_LIVES
-        self.aiming_mode = AimingMode.MANUAL
+        self.active_weapon_slot = PLAYER_DEFAULT_ACTIVE_WEAPON_SLOT
         self.auto_targets: list[GameObject] = []
         self.active_combo: ComboEffect | None = None
         self.fc_streak_counter = PLAYER_INITIAL_FC
@@ -137,6 +129,7 @@ class PlayerShip(GameObject):
         self.lives = PLAYER_STARTING_LIVES
         self.weapon_slots = [None for _ in range(PLAYER_WEAPON_SLOT_COUNT)]
         self.special_slot = None
+        self.active_weapon_slot = PLAYER_DEFAULT_ACTIVE_WEAPON_SLOT
         self.drone_manager = DroneManager(self, [])
         self.drones = self.drone_manager.drones
         self.unlocked_drones = self.drone_manager.unlocked_drone_types
@@ -167,31 +160,56 @@ class PlayerShip(GameObject):
         self.y = _clamp(self.y + dy * dt, ZERO_MOVEMENT, SCREEN_HEIGHT - self.height)
 
     def fire(self, dt: float) -> list[Bullet]:
-        """Fire equipped weapons and apply active combo behavior when available."""
-        self._recalculate_combo()
-        bullets: list[Bullet] = []
-        muzzle_offsets = (PLAYER_LEFT_MUZZLE_OFFSET, PLAYER_RIGHT_MUZZLE_OFFSET)
+        """Fire only the currently selected weapon slot."""
+        weapon = self._active_weapon()
+        if weapon is None:
+            return []
 
-        for slot_index, weapon in enumerate(self.weapon_slots):
+        bullets = weapon.fire(
+            self._slot_origin_x(self.active_weapon_slot),
+            self.y,
+            self._get_fire_direction(),
+        )
+        if bullets:
+            play_sound("player_fire")
+        for bullet in bullets:
+            _mark_player_bullet(bullet)
+        return bullets
+
+    def activate_combo(self, first_slot: int, second_slot: int) -> tuple[list[Bullet], ComboEffect | None]:
+        """Fire a slot-pair combo attack when both weapons form an unlocked combo."""
+        combo = self._combo_for_slots(first_slot, second_slot)
+        if combo is None or not combo.is_unlocked:
+            return [], None
+
+        bullets: list[Bullet] = []
+        for slot_index in (first_slot, second_slot):
+            weapon = self.weapon_slots[slot_index]
+            if weapon is None or not weapon.can_fire():
+                return [], None
+
+        for slot_index in (first_slot, second_slot):
+            weapon = self.weapon_slots[slot_index]
             if weapon is None:
                 continue
-
-            origin_x = self.x + self.width / PLAYER_CENTER_DIVISOR + muzzle_offsets[slot_index]
-            origin_y = self.y
-            fired_bullets = weapon.fire(origin_x, origin_y, self._get_fire_direction())
-            if fired_bullets:
-                play_sound("player_fire")
-            for bullet in fired_bullets:
-                _mark_player_bullet(bullet)
+            fired_bullets = weapon.fire(
+                self._slot_origin_x(slot_index),
+                self.y,
+                self._get_fire_direction(),
+            )
             bullets.extend(fired_bullets)
 
-        combo = self.get_active_combo()
-        if combo is not None:
-            combo.apply(bullets, self.auto_targets)
-            for bullet in bullets:
-                _sync_bullet_aliases(bullet)
+        if not bullets:
+            return [], None
 
-        return bullets
+        play_sound("player_fire")
+        for bullet in bullets:
+            _mark_player_bullet(bullet)
+        combo.apply(bullets, self.auto_targets)
+        for bullet in bullets:
+            _sync_bullet_aliases(bullet)
+        self.active_combo = combo
+        return bullets, combo
 
     def activate_skill(self) -> dict[str, object] | None:
         """Trigger the special slot skill when its weapon cooldown is ready."""
@@ -203,15 +221,33 @@ class PlayerShip(GameObject):
         return effect
 
     def equip_weapon(self, weapon: Weapon | None, slot_index: int) -> None:
-        """Equip a weapon into one of two slots and recalculate combo state."""
+        """Equip a weapon into one of the player weapon slots and recalculate combos."""
         if slot_index < MIN_HEALTH or slot_index >= PLAYER_WEAPON_SLOT_COUNT:
-            raise IndexError("weapon slot index must be 0 or 1")
+            raise IndexError("weapon slot index must be between 0 and 2")
 
         self.weapon_slots[slot_index] = weapon
         self._recalculate_combo()
 
+    def select_weapon_slot(self, slot_index: int) -> bool:
+        """Select the weapon slot that Space will fire."""
+        if slot_index < MIN_HEALTH or slot_index >= len(self.weapon_slots):
+            return False
+        self.active_weapon_slot = slot_index
+        return True
+
+    def cycle_weapon_slot(self) -> int:
+        """Cycle to the next equipped weapon slot, skipping empty slots."""
+        slot_count = len(self.weapon_slots)
+        for offset in range(1, slot_count + 1):
+            next_slot = (self.active_weapon_slot + offset) % slot_count
+            if self.weapon_slots[next_slot] is not None:
+                self.active_weapon_slot = next_slot
+                return next_slot
+        self.active_weapon_slot = PLAYER_DEFAULT_ACTIVE_WEAPON_SLOT
+        return self.active_weapon_slot
+
     def get_active_combo(self) -> ComboEffect | None:
-        """Return the unlocked combo effect for two different weapon types, if any."""
+        """Return an unlocked combo effect among equipped weapons, if any."""
         self._recalculate_combo()
         if self.active_combo is None or not self.active_combo.is_unlocked:
             return None
@@ -274,58 +310,66 @@ class PlayerShip(GameObject):
         """Stub — player debuff effects not implemented yet (Phase 3)."""
         pass
 
-    def toggle_aiming_mode(self) -> AimingMode:
-        """Toggle between automatic nearest-target aiming and manual straight fire."""
-        self.aiming_mode = AimingMode.AUTO if self.aiming_mode is AimingMode.MANUAL else AimingMode.MANUAL
-        return self.aiming_mode
-
     def toggle_drone_mode(self) -> DroneMode:
         """Toggle all active drones between AUTO and FOLLOW mode."""
         return self.drone_manager.toggle_mode()
 
     def set_auto_targets(self, enemies: Sequence[GameObject]) -> None:
-        """Store enemies used by AUTO aiming and combo target selection."""
+        """Store enemies used by combo target selection."""
         self.auto_targets = [enemy for enemy in enemies if getattr(enemy, "active", True)]
 
     def _get_fire_direction(self) -> Direction:
-        """Return the current fire direction based on the active aiming mode."""
-        if self.aiming_mode is AimingMode.MANUAL:
-            return MANUAL_FIRE_DIRECTION
-
-        nearest_enemy = self._nearest_enemy()
-        if nearest_enemy is None:
-            return MANUAL_FIRE_DIRECTION
-
-        origin_x = self.x + self.width / PLAYER_CENTER_DIVISOR
-        origin_y = self.y
-        return nearest_enemy.x - origin_x, nearest_enemy.y - origin_y
-
-    def _nearest_enemy(self) -> GameObject | None:
-        """Return the nearest active enemy for AUTO aiming."""
-        active_targets = [enemy for enemy in self.auto_targets if getattr(enemy, "active", True)]
-        if not active_targets:
-            return None
-
-        origin_x = self.x + self.width / PLAYER_CENTER_DIVISOR
-        origin_y = self.y
-        return min(active_targets, key=lambda enemy: (enemy.x - origin_x) ** 2 + (enemy.y - origin_y) ** 2)
+        """Return the manual upward fire direction."""
+        return MANUAL_FIRE_DIRECTION
 
     def _recalculate_combo(self) -> None:
-        """Recalculate combo state from the two equipped weapon slots."""
-        first_weapon, second_weapon = self.weapon_slots
-        if first_weapon is None or second_weapon is None:
-            self.active_combo = None
-            return
-        if first_weapon.weapon_type is second_weapon.weapon_type:
-            self.active_combo = None
-            return
+        """Recalculate combo state from any two equipped weapon slots."""
+        fallback_combo: ComboEffect | None = None
+        for first_slot in range(len(self.weapon_slots)):
+            for second_slot in range(first_slot + 1, len(self.weapon_slots)):
+                combo = self._combo_for_slots(first_slot, second_slot)
+                if combo is None:
+                    continue
+                if combo.is_unlocked:
+                    self.active_combo = combo
+                    return
+                if fallback_combo is None:
+                    fallback_combo = combo
+        self.active_combo = fallback_combo
 
-        self.active_combo = ComboEffect(
+    def _combo_for_slots(self, first_slot: int, second_slot: int) -> ComboEffect | None:
+        """Return the combo effect for two slot indices when their weapon types differ."""
+        if first_slot == second_slot:
+            return None
+        if first_slot < MIN_HEALTH or second_slot < MIN_HEALTH:
+            return None
+        if first_slot >= len(self.weapon_slots) or second_slot >= len(self.weapon_slots):
+            return None
+
+        first_weapon = self.weapon_slots[first_slot]
+        second_weapon = self.weapon_slots[second_slot]
+        if first_weapon is None or second_weapon is None:
+            return None
+        if first_weapon.weapon_type is second_weapon.weapon_type:
+            return None
+
+        return ComboEffect(
             first_weapon.weapon_type,
             second_weapon.weapon_type,
             first_weapon.upgrade_level,
             second_weapon.upgrade_level,
         )
+
+    def _active_weapon(self) -> Weapon | None:
+        """Return the currently selected weapon, if one is equipped."""
+        if self.active_weapon_slot < MIN_HEALTH or self.active_weapon_slot >= len(self.weapon_slots):
+            return None
+        return self.weapon_slots[self.active_weapon_slot]
+
+    def _slot_origin_x(self, slot_index: int) -> float:
+        """Return the muzzle x coordinate for a weapon slot."""
+        offset = PLAYER_MUZZLE_OFFSETS[slot_index] if slot_index < len(PLAYER_MUZZLE_OFFSETS) else 0.0
+        return self.x + self.width / PLAYER_CENTER_DIVISOR + offset
 
 
 def _is_pressed(keys_pressed: Mapping[int, bool] | Sequence[bool], key: int) -> bool:

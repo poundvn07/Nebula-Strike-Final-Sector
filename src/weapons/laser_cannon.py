@@ -7,6 +7,7 @@ from src.utils.constants import LASER_CANNON_BASE_DAMAGE
 from src.weapons.weapon import Direction, MAX_WEAPON_LEVEL, SkillEffect, Weapon, WeaponType
 
 LASER_NAME = "Laser Cannon"
+LASER_STATS_KEY = "laser_cannon"
 LASER_COOLDOWN_SECONDS = 0.35
 LASER_PROJECTILE_SPEED = 520.0
 LASER_OVERCHARGE_DURATION_SECONDS = 2.0
@@ -23,6 +24,7 @@ class LaserCannon(Weapon):
             damage=LASER_CANNON_BASE_DAMAGE,
             cooldown=LASER_COOLDOWN_SECONDS,
             weapon_type=WeaponType.LASER,
+            stats_key=LASER_STATS_KEY,
         )
 
     def fire(self, origin_x: float, origin_y: float, direction: Direction) -> list[Bullet]:

@@ -7,6 +7,7 @@ from src.utils.constants import MISSILE_SALVO_BASE_DAMAGE
 from src.weapons.weapon import Direction, SkillEffect, Weapon, WeaponType
 
 MISSILE_NAME = "Missile Salvo"
+MISSILE_STATS_KEY = "missile_salvo"
 MISSILE_COOLDOWN_SECONDS = 1.1
 MISSILE_PROJECTILE_SPEED = 330.0
 MISSILE_EXPLOSION_RADIUS = 48.0
@@ -24,6 +25,7 @@ class MissileSalvo(Weapon):
             damage=MISSILE_SALVO_BASE_DAMAGE,
             cooldown=MISSILE_COOLDOWN_SECONDS,
             weapon_type=WeaponType.MISSILE,
+            stats_key=MISSILE_STATS_KEY,
         )
 
     def fire(self, origin_x: float, origin_y: float, direction: Direction) -> list[Bullet]:

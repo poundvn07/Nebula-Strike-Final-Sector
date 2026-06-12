@@ -7,6 +7,7 @@ from src.utils.constants import THUNDER_RAIL_BASE_DAMAGE
 from src.weapons.weapon import Direction, MAX_WEAPON_LEVEL, SkillEffect, Weapon, WeaponType
 
 THUNDER_NAME = "Thunder Rail"
+THUNDER_STATS_KEY = "thunder_rail"
 THUNDER_COOLDOWN_SECONDS = 0.8
 THUNDER_PROJECTILE_SPEED = 500.0
 THUNDER_DEFAULT_CHAIN_TARGETS = 2
@@ -25,6 +26,7 @@ class ThunderRail(Weapon):
             damage=THUNDER_RAIL_BASE_DAMAGE,
             cooldown=THUNDER_COOLDOWN_SECONDS,
             weapon_type=WeaponType.THUNDER,
+            stats_key=THUNDER_STATS_KEY,
         )
 
     def fire(self, origin_x: float, origin_y: float, direction: Direction) -> list[Bullet]:

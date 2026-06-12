@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from src.entities.feather_core import FeatherCore
     from src.entities.player_ship import PlayerShip
 
-DRONE_SUMMON_FC_COST = 15
+DRONE_SUMMON_FC_COST = 30
 
 
 class DroneManager:
@@ -52,7 +52,7 @@ class DroneManager:
         return emitted_bullets
 
     def summon_drone(self, drone_type: type[Drone]) -> Drone | None:
-        """Spend 15 FC to summon one drone when capacity and unlock state allow it."""
+        """Spend FC to summon one drone when capacity and unlock state allow it."""
         if len(self._active_drones()) >= MAX_ACTIVE_DRONES:
             return None
         if not self.is_unlocked(drone_type):

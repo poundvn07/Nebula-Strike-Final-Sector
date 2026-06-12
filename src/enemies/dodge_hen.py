@@ -11,15 +11,15 @@ from src.enemies.enemy import Enemy
 from src.utils.constants import MIN_HEALTH
 from src.weapons.weapon import WeaponType
 
-DODGE_HEN_WIDTH = 42
-DODGE_HEN_HEIGHT = 38
+DODGE_HEN_WIDTH = 54
+DODGE_HEN_HEIGHT = 49
 DODGE_HEN_HP = 44
 DODGE_HEN_STRAFE_SPEED = 115.0
 DODGE_HEN_DODGE_SPEED = 180.0
 DODGE_HEN_SCORE_VALUE = 320
 DODGE_HEN_FC_DROP_MIN = 5
 DODGE_HEN_FC_DROP_MAX = 8
-DODGE_HEN_ATTACK_INTERVAL_SECONDS = 1.25
+DODGE_HEN_ATTACK_INTERVAL_SECONDS = 1.9
 DODGE_HEN_PELLET_SPEED = 125.0
 DODGE_HEN_PELLET_DAMAGE = 6
 DODGE_HEN_PELLET_WIDTH = 6
@@ -74,7 +74,7 @@ class DodgeHen(Enemy):
         self.x += sin(self.strafe_time * DODGE_HEN_STRAFE_FREQUENCY) * DODGE_HEN_STRAFE_AMPLITUDE * dt
 
     def attack(self, dt: float) -> list[Bullet]:
-        """Overrides attack() to fire small pellets on a short cooldown."""
+        """Overrides attack() to fire small pellets on a spaced cooldown."""
         self._update_attack_cooldown(dt)
         if not self._can_attack():
             return []

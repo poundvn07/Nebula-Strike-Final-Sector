@@ -18,7 +18,7 @@ from src.systems.resource_manager import (
     WEAPON_SHOP_TYPES,
 )
 from src.systems.save_manager import DRONE_TYPES, SaveManager
-from src.utils.constants import SCREEN_WIDTH
+from src.utils.constants import SCREEN_HEIGHT, SCREEN_WIDTH
 
 if TYPE_CHECKING:
     from src.entities.drone import Drone
@@ -34,37 +34,40 @@ PREP_BUTTON_DISABLED_COLOR = (54, 58, 70)
 PREP_BUTTON_TEXT_COLOR = (255, 255, 255)
 PREP_HP_BACK_COLOR = (60, 26, 34)
 PREP_HP_FILL_COLOR = (80, 220, 130)
-PREP_FONT_SIZE = 20
-PREP_SMALL_FONT_SIZE = 17
-PREP_TITLE_FONT_SIZE = 40
+PREP_FONT_SIZE = 22
+PREP_SMALL_FONT_SIZE = 18
+PREP_TITLE_FONT_SIZE = 50
 PREP_CENTER_X = SCREEN_WIDTH // 2
-PREP_TITLE_Y = 38
-SECTION_LEFT_X = 56
-SECTION_RIGHT_X = 456
-SECTION_WIDTH = 288
-BUTTON_WIDTH = 176
-BUTTON_HEIGHT = 30
-SLOT_BUTTON_WIDTH = 44
+PREP_TITLE_Y = 58
+SECTION_WIDTH = 260
+SECTION_LEFT_X = 78
+SECTION_MIDDLE_X = PREP_CENTER_X - SECTION_WIDTH // 2
+SECTION_RIGHT_X = SCREEN_WIDTH - SECTION_LEFT_X - SECTION_WIDTH
+BUTTON_WIDTH = 214
+BUTTON_HEIGHT = 34
+SLOT_BUTTON_WIDTH = 42
 SLOT_BUTTON_GAP = 8
-HP_BAR_WIDTH = 300
-HP_BAR_HEIGHT = 18
-LINE_HEIGHT = 36
-BUTTON_GAP = 12
-STATUS_Y = 84
-PROGRESSION_TIP_Y = 158
-SECTION_HEADING_Y = 180
-SECTION_BODY_Y = 208
-WEAPON_SLOT_SPACING = 64
-WEAPON_BUTTON_X = SECTION_LEFT_X + 20
-SHOP_HEADING_Y = 326
-SHOP_BODY_Y = 354
-SHOP_ROW_HEIGHT = 32
-SHOP_SLOT_ONE_X = SECTION_LEFT_X + 196
+HP_BAR_WIDTH = 360
+HP_BAR_HEIGHT = 20
+LINE_HEIGHT = 40
+STATUS_Y = 126
+PROGRESSION_TIP_Y = 232
+SECTION_HEADING_Y = 278
+SECTION_BODY_Y = 316
+WEAPON_SLOT_SPACING = 70
+WEAPON_BUTTON_X = SECTION_LEFT_X + 18
+SHOP_HEADING_Y = SECTION_HEADING_Y
+SHOP_BODY_Y = SECTION_BODY_Y
+SHOP_ROW_HEIGHT = 46
+SHOP_LABEL_X = SECTION_MIDDLE_X
+SHOP_SLOT_ONE_X = SECTION_MIDDLE_X + 150
 SHOP_SLOT_TWO_X = SHOP_SLOT_ONE_X + SLOT_BUTTON_WIDTH + SLOT_BUTTON_GAP
-REPAIR_SECTION_Y = 430
-BEGIN_BUTTON_RECT = pygame.Rect(PREP_CENTER_X - 95, 548, 190, 38)
+SHOP_SLOT_THREE_X = SHOP_SLOT_TWO_X + SLOT_BUTTON_WIDTH + SLOT_BUTTON_GAP
+REPAIR_SECTION_Y = 548
+BEGIN_BUTTON_RECT = pygame.Rect(PREP_CENTER_X - 115, SCREEN_HEIGHT - 76, 230, 44)
 REPAIR_BUTTON_RECT = pygame.Rect(SECTION_RIGHT_X, REPAIR_SECTION_Y + 28, BUTTON_WIDTH, BUTTON_HEIGHT)
-LIFE_BUTTON_RECT = pygame.Rect(SECTION_RIGHT_X, REPAIR_SECTION_Y + 64, BUTTON_WIDTH, BUTTON_HEIGHT)
+LIFE_BUTTON_RECT = pygame.Rect(SECTION_RIGHT_X, REPAIR_SECTION_Y + 70, BUTTON_WIDTH, BUTTON_HEIGHT)
+FEEDBACK_Y = SCREEN_HEIGHT - 106
 
 
 ButtonAction = Callable[[], bool]
@@ -183,7 +186,7 @@ class PreparationScene(Scene):
         font = self._get_font()
         heading = font.render("Weapons", True, PREP_TEXT_COLOR)
         _blit_centered(surface, heading, SECTION_LEFT_X + SECTION_WIDTH // 2, SECTION_HEADING_Y)
-        for slot_index, weapon in enumerate(self.player.weapon_slots[:2]):
+        for slot_index, weapon in enumerate(self.player.weapon_slots):
             y = SECTION_BODY_Y + slot_index * WEAPON_SLOT_SPACING
             if weapon is None:
                 label = f"Slot {slot_index + 1}: Empty"
@@ -201,7 +204,7 @@ class PreparationScene(Scene):
         font = self._get_font()
         small_font = self._get_small_font()
         current_map = int(self.game_state.get("current_map", 1))
-        surface.blit(font.render("Weapon Shop", True, PREP_TEXT_COLOR), (SECTION_LEFT_X, SHOP_HEADING_Y))
+        _blit_centered(surface, font.render("Weapon Shop", True, PREP_TEXT_COLOR), SECTION_MIDDLE_X + SECTION_WIDTH // 2, SHOP_HEADING_Y)
         for row_index, item in enumerate(self.resource_manager.get_weapon_shop_items(current_map)):
             y = SHOP_BODY_Y + row_index * SHOP_ROW_HEIGHT
             unlocked = bool(item["unlocked"])
@@ -210,12 +213,12 @@ class PreparationScene(Scene):
             unlock_map = int(item["unlock_map"])
             label = f"{name} ({cost} FC)" if unlocked else f"{name} - Map {unlock_map}"
             color = PREP_TEXT_COLOR if unlocked else PREP_MUTED_TEXT_COLOR
-            surface.blit(small_font.render(label, True, color), (SECTION_LEFT_X, y + 7))
+            surface.blit(small_font.render(label, True, color), (SHOP_LABEL_X, y + 8))
             if not unlocked:
                 continue
 
             weapon_key = str(item["key"])
-            for slot_index, x in enumerate((SHOP_SLOT_ONE_X, SHOP_SLOT_TWO_X)):
+            for slot_index, x in enumerate((SHOP_SLOT_ONE_X, SHOP_SLOT_TWO_X, SHOP_SLOT_THREE_X)):
                 rect = pygame.Rect(x, y, SLOT_BUTTON_WIDTH, BUTTON_HEIGHT)
                 self._add_button(
                     surface,
@@ -241,7 +244,7 @@ class PreparationScene(Scene):
             surface.blit(small_font.render(label, True, PREP_TEXT_COLOR), (SECTION_RIGHT_X, y))
             if drone.is_destroyed:
                 rect = pygame.Rect(SECTION_RIGHT_X, y + 22, BUTTON_WIDTH, BUTTON_HEIGHT)
-                self._add_button(surface, rect, "Re-summon (15 FC)", DRONE_SUMMON_COST, lambda t=type(drone): self._summon_drone(t))
+                self._add_button(surface, rect, f"Re-summon ({DRONE_SUMMON_COST} FC)", DRONE_SUMMON_COST, lambda t=type(drone): self._summon_drone(t))
                 y += BUTTON_HEIGHT
             y += LINE_HEIGHT
 
@@ -251,9 +254,10 @@ class PreparationScene(Scene):
         for drone_type in DRONE_TYPES.values():
             if drone_type in self.player.unlocked_drones or int(getattr(drone_type, "unlock_cost", 0)) <= 0:
                 continue
-            label = f"{drone_type.__name__} (40 FC)"
+            unlock_cost = int(getattr(drone_type, "unlock_cost", DRONE_UNLOCK_COST))
+            label = f"{drone_type.__name__} ({unlock_cost} FC)"
             rect = pygame.Rect(SECTION_RIGHT_X, unlock_y, BUTTON_WIDTH, BUTTON_HEIGHT)
-            self._add_button(surface, rect, label, DRONE_UNLOCK_COST, lambda t=drone_type: self._unlock_drone(t))
+            self._add_button(surface, rect, label, unlock_cost, lambda t=drone_type: self._unlock_drone(t))
             unlock_y += LINE_HEIGHT
 
     def _draw_repair_section(self, surface: pygame.Surface) -> None:
@@ -272,7 +276,7 @@ class PreparationScene(Scene):
         if not self.feedback_text:
             return
         text = self._get_font().render(self.feedback_text, True, self.feedback_color)
-        _blit_centered(surface, text, PREP_CENTER_X, 526)
+        _blit_centered(surface, text, PREP_CENTER_X, FEEDBACK_Y)
 
     def _add_button(
         self,

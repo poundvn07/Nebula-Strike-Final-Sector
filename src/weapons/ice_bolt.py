@@ -7,6 +7,7 @@ from src.utils.constants import ICE_BOLT_BASE_DAMAGE
 from src.weapons.weapon import Direction, SkillEffect, Weapon, WeaponType
 
 ICE_NAME = "Ice Bolt"
+ICE_STATS_KEY = "ice_bolt"
 ICE_COOLDOWN_SECONDS = 0.5
 ICE_PROJECTILE_SPEED = 300.0
 ICE_SLOW_DEBUFF = "SLOWED"
@@ -26,6 +27,7 @@ class IceBolt(Weapon):
             damage=ICE_BOLT_BASE_DAMAGE,
             cooldown=ICE_COOLDOWN_SECONDS,
             weapon_type=WeaponType.ICE,
+            stats_key=ICE_STATS_KEY,
         )
 
     def fire(self, origin_x: float, origin_y: float, direction: Direction) -> list[Bullet]:

@@ -21,11 +21,11 @@ FEVER_DURATION_SECONDS = 5.0
 FEVER_DAMAGE_MULTIPLIER = 1.5
 NORMAL_DAMAGE_MULTIPLIER = 1.0
 REPAIR_FC_CHUNK = 10
-UPGRADE_LEVEL_ONE_COST = 25
-UPGRADE_LEVEL_TWO_COST = 50
-DRONE_SUMMON_COST = 15
-DRONE_UNLOCK_COST = 40
-LIFE_PURCHASE_COST = 50
+UPGRADE_LEVEL_ONE_COST = 120
+UPGRADE_LEVEL_TWO_COST = 260
+DRONE_SUMMON_COST = 30
+DRONE_UNLOCK_COST = 120
+LIFE_PURCHASE_COST = 160
 MAX_PURCHASED_LIVES = 5
 WEAPON_SHOP_ORDER = ("LASER_CANNON", "PLASMA_SPREAD", "ICE_BOLT", "MISSILE_SALVO", "THUNDER_RAIL")
 WEAPON_SHOP_TYPES: dict[str, type[Weapon]] = {
@@ -36,11 +36,11 @@ WEAPON_SHOP_TYPES: dict[str, type[Weapon]] = {
     "THUNDER_RAIL": ThunderRail,
 }
 WEAPON_PURCHASE_COSTS = {
-    "LASER_CANNON": 30,
-    "PLASMA_SPREAD": 45,
-    "ICE_BOLT": 40,
-    "MISSILE_SALVO": 55,
-    "THUNDER_RAIL": 70,
+    "LASER_CANNON": 60,
+    "PLASMA_SPREAD": 95,
+    "ICE_BOLT": 100,
+    "MISSILE_SALVO": 130,
+    "THUNDER_RAIL": 155,
 }
 WEAPON_UNLOCK_MAPS = {
     "LASER_CANNON": FIRST_MAP_INDEX,
@@ -98,7 +98,7 @@ class ResourceManager:
         return int(player.repair(fc_amount))
 
     def upgrade_weapon(self, player: PlayerShip, slot: int, weapon: Weapon | None = None) -> bool:
-        """Spend 25 or 50 FC, then upgrade the selected weapon."""
+        """Spend the weapon's configured FC cost, then upgrade the selected weapon."""
         selected_weapon = weapon or player.weapon_slots[slot]
         if selected_weapon is None:
             return False
@@ -115,7 +115,7 @@ class ResourceManager:
         return upgraded
 
     def summon_drone(self, player: PlayerShip, drone_type: type[Drone]) -> Drone | None:
-        """Spend 15 FC, instantiate a drone, and add it to the player's drones."""
+        """Spend FC, instantiate a drone, and add it to the player's drones."""
         summon_method = getattr(player, "summon_drone", None)
         if summon_method is not None:
             return summon_method(drone_type)
@@ -128,7 +128,7 @@ class ResourceManager:
         return drone
 
     def unlock_drone_type(self, player: PlayerShip, drone_type: type[Drone]) -> bool:
-        """Spend 40 FC and add the drone type to player.unlocked_drones."""
+        """Spend the drone unlock cost and add the drone type to player.unlocked_drones."""
         unlocked_drones = _ensure_unlocked_drones(player)
         if drone_type in unlocked_drones:
             return True

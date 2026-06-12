@@ -40,6 +40,8 @@ def test_save_and_load_roundtrip(save_path: Path) -> None:
     laser.upgrade()
     player.weapon_slots[0] = laser
     player.weapon_slots[1] = PlasmaSpread()
+    player.weapon_slots[2] = MissileSalvo()
+    player.select_weapon_slot(2)
     player.drone_manager.unlocked_drone_types.add(ShieldDrone)
     player.unlocked_drones = player.drone_manager.unlocked_drone_types
     player.drones.append(AttackDrone(player))
@@ -62,6 +64,8 @@ def test_save_and_load_roundtrip(save_path: Path) -> None:
     assert data["highest_wave_reached"] == 4
     assert data["weapon_slots"][0] == {"type": "LASER_CANNON", "level": 2}
     assert data["weapon_slots"][1] == {"type": "PLASMA_SPREAD", "level": 1}
+    assert data["weapon_slots"][2] == {"type": "MISSILE_SALVO", "level": 1}
+    assert data["active_weapon_slot"] == 2
     assert data["drones_active"] == [{"type": "ATTACK_DRONE"}]
     assert "SHIELD_DRONE" in data["unlocked_drone_types"]
 
@@ -75,6 +79,8 @@ def test_save_and_load_roundtrip(save_path: Path) -> None:
     assert isinstance(restored_player.weapon_slots[0], LaserCannon)
     assert restored_player.weapon_slots[0].upgrade_level == 2
     assert isinstance(restored_player.weapon_slots[1], PlasmaSpread)
+    assert isinstance(restored_player.weapon_slots[2], MissileSalvo)
+    assert restored_player.active_weapon_slot == 2
     assert any(isinstance(drone, AttackDrone) for drone in restored_player.drones)
     assert ShieldDrone in restored_player.unlocked_drones
 
@@ -101,6 +107,8 @@ def test_starting_loadout_equips_weapon(save_path: Path) -> None:
     assert isinstance(player.weapon_slots[0], LaserCannon)
     assert player.weapon_slots[0].upgrade_level == 1
     assert player.weapon_slots[1] is None
+    assert player.weapon_slots[2] is None
+    assert player.active_weapon_slot == 0
     assert len(fired_bullets) == 1
 
 
@@ -191,6 +199,9 @@ def test_game_scene_final_life_resets_run(save_path: Path) -> None:
     assert data["fc_inventory"] == 0
     assert data["lives"] == 3
     assert data["weapon_slots"][0] == {"type": "LASER_CANNON", "level": 1}
+    assert data["weapon_slots"][1] is None
+    assert data["weapon_slots"][2] is None
+    assert data["active_weapon_slot"] == 0
     assert isinstance(scene_manager.current_scene, ResultScene)
 
 
@@ -233,4 +244,14 @@ def test_resource_manager_weapon_shop_can_replace_equipped_slot() -> None:
 
     assert ResourceManager().purchase_weapon(player, "MISSILE_SALVO", 0, current_map=3) is True
     assert isinstance(player.weapon_slots[0], MissileSalvo)
+    assert player.fc_inventory == 0
+
+
+def test_resource_manager_weapon_shop_can_fill_third_slot() -> None:
+    """The preparation shop can buy a weapon into the third weapon slot."""
+    player = PlayerShip()
+    player.add_fc(WEAPON_PURCHASE_COSTS["PLASMA_SPREAD"])
+
+    assert ResourceManager().purchase_weapon(player, "PLASMA_SPREAD", 2, current_map=1) is True
+    assert isinstance(player.weapon_slots[2], PlasmaSpread)
     assert player.fc_inventory == 0
