@@ -5,7 +5,7 @@ from __future__ import annotations
 from math import hypot
 
 from src.entities.bullet import Bullet
-from src.entities.feather_core import FeatherCore
+from src.entities.pickup import Pickup
 from src.enemies.enemy import Enemy
 from src.utils.constants import SCREEN_HEIGHT, SCREEN_WIDTH
 
@@ -79,7 +79,7 @@ class KamikazeChicken(Enemy):
         """Overrides attack() with collision damage only and no projectile."""
         return []
 
-    def on_death(self) -> list[FeatherCore]:
+    def on_death(self) -> list[Pickup]:
         """Overrides on_death() to drop 1 FC and create a small explosion hitbox."""
         self.death_explosion_hitbox = (
             self.x - KAMIKAZE_EXPLOSION_RADIUS,

@@ -6,7 +6,7 @@ from math import cos, sin
 from random import randint
 
 from src.entities.bullet import Bullet
-from src.entities.feather_core import FeatherCore
+from src.entities.pickup import Pickup
 from src.enemies.enemy import Enemy
 from src.utils.constants import SCREEN_WIDTH
 
@@ -113,13 +113,13 @@ class SpaceRooster(Enemy):
         self._start_attack_cooldown(SPACE_ROOSTER_PHASE_THREE_ATTACK_INTERVAL_SECONDS)
         return self._next_phase_three_attack()
 
-    def take_damage(self, amount: int) -> list[FeatherCore]:
+    def take_damage(self, amount: int) -> list[Pickup]:
         """Apply damage and update the active boss phase immediately."""
         drops = super().take_damage(amount)
         self._update_phase()
         return drops
 
-    def on_death(self) -> list[FeatherCore]:
+    def on_death(self) -> list[Pickup]:
         """Override on_death() to trigger the boss explosion flag and drop configured FC."""
         self.boss_death_explosion_triggered = True
         drop_count = randint(int(self.fc_drop_min), int(self.fc_drop_max))

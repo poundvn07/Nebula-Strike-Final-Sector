@@ -93,15 +93,13 @@ class SaveManager:
             for drone_name in data.get("unlocked_drone_types", [])
             if (drone_type := DRONE_TYPES.get(str(drone_name))) is not None
         }
-        player.drone_manager.unlocked_drone_types = set(unlocked_drone_types)
-        player.unlocked_drones = player.drone_manager.unlocked_drone_types
-
-        player.drone_manager.drones = []
+        player.unlocked_drones = set(unlocked_drone_types)
+        player.drones = []
         for drone_data in data.get("drones_active", []):
             drone = _deserialize_drone(drone_data, player)
             if drone is not None:
-                player.drone_manager.drones.append(drone)
-        player.drones = player.drone_manager.drones
+                drone.set_mode(player.drone_mode)
+                player.drones.append(drone)
 
     def apply_starting_loadout(self, player: PlayerShip) -> None:
         """Equip the configured New Game starter weapons onto a PlayerShip."""

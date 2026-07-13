@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from src.entities.bullet import Bullet
-from src.entities.feather_core import FeatherCore
+from src.entities.pickup import Pickup
 from src.enemies.enemy import Enemy, FormationOffset
 
 EGG_BOMBER_WIDTH = 51
@@ -79,6 +79,6 @@ class EggBomber(Enemy):
             ),
         ]
 
-    def on_death(self) -> list[FeatherCore]:
+    def on_death(self) -> list[Pickup]:
         """Overrides on_death() to drop 1-2 Feather Cores."""
         return self.drop_fc()

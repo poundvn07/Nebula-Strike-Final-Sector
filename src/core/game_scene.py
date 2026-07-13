@@ -4,19 +4,16 @@ from __future__ import annotations
 
 import pygame
 
-from src.core.event_handler import EventHandler
 from src.core.scene_manager import Scene, SceneManager
 from src.enemies.chicken_overlord import ChickenOverlord
 from src.entities.bullet import Bullet
-from src.entities.explosion import ExplosionEffect
-from src.entities.feather_core import FeatherCore
+from src.entities.effect import Effect
+from src.entities.pickup import Pickup
 from src.entities.player_ship import PlayerShip
-from src.systems.collision_system import CollisionSystem
-from src.systems.resource_manager import ResourceManager
 from src.systems.save_manager import SaveManager
 from src.systems.wave_manager import WaveManager
 from src.ui.hud import HUD
-from src.utils.assets import (
+from src.utils.resource import (
     background_music_muted,
     load_sprite,
     play_sound,
@@ -79,7 +76,6 @@ class GameScene(Scene):
         save_manager: SaveManager | None = None,
         game_state: dict | None = None,
         scene_manager: SceneManager | None = None,
-        resource_manager: ResourceManager | None = None,
     ) -> None:
         """Initialize the scene with player, save manager, and map progress state."""
         self.player = player
@@ -87,14 +83,11 @@ class GameScene(Scene):
         self.game_state = dict(game_state or {})
         self.current_map = int(self.game_state.get("current_map", FIRST_MAP_INDEX))
         self.scene_manager = scene_manager
-        self.resource_manager = resource_manager or ResourceManager()
         self.wave_manager = WaveManager(self.current_map)
-        self.collision_system = CollisionSystem(self.resource_manager)
-        self.event_handler = EventHandler(self.player)
         self.hud = HUD()
         self.bullets: list[Bullet] = []
-        self.fc_items: list[FeatherCore] = []
-        self.explosions: list[ExplosionEffect] = []
+        self.fc_items: list[Pickup] = []
+        self.effects: list[Effect] = []
         self.fc_earned_this_map = 0
         self.total_waves = int(self.wave_manager.map_config["waves"])
         self.reload_map_number: int | None = None
@@ -130,7 +123,14 @@ class GameScene(Scene):
             if self._is_pause_overlay_active():
                 return
 
-        self.event_handler.handle_event(event)
+        if event.type != pygame.KEYDOWN:
+            return
+        if event.key == pygame.K_TAB:
+            self.player.cycle_weapon_slot()
+        elif event.key == pygame.K_q:
+            self.player.toggle_drone_mode()
+        elif event.key in WEAPON_KEYS:
+            self.player.select_weapon_slot(WEAPON_KEYS.index(event.key))
 
     def update(self, dt: float) -> None:
         """Advance combat systems and transition to results when the map resolves."""
@@ -139,12 +139,11 @@ class GameScene(Scene):
         if self._is_pause_overlay_active():
             return
 
-        self.resource_manager.update(dt)
         if self._is_wave_intro_active():
             self._update_player(dt)
             self._update_wave_intro(dt)
-            self._update_explosions(dt)
-            self.hud.update(dt, fever_status=self.resource_manager, combo_name=self._last_combo_name)
+            self._update_effects(dt)
+            self.hud.update(dt, fever_status=self.player, combo_name=self._last_combo_name)
             return
 
         if self._respawn_invulnerable_timer > 0.0:
@@ -160,11 +159,11 @@ class GameScene(Scene):
         self._update_drones(dt)
         self._update_gameplay_objects(dt)
         if self._respawn_invulnerable_timer <= 0.0:
-            self.collision_system.check_all(self.player, self.bullets, self.wave_manager.enemies_alive, self.fc_items)
+            self._check_collisions()
         self._spawn_enemy_death_explosions()
         self._prune_inactive_objects()
         self._notify_bosses_of_minion_deaths()
-        self.hud.update(dt, fever_status=self.resource_manager, combo_name=self._last_combo_name)
+        self.hud.update(dt, fever_status=self.player, combo_name=self._last_combo_name)
 
         if not self.player.is_alive():
             self._handle_player_defeat()
@@ -179,7 +178,7 @@ class GameScene(Scene):
         self.hud.render(
             surface,
             self.player,
-            fever_status=self.resource_manager,
+            fever_status=self.player,
             current_wave=self.wave_manager.current_wave,
             total_waves=self.total_waves,
             boss=self._get_active_boss(),
@@ -242,7 +241,7 @@ class GameScene(Scene):
         if not fired_bullets or combo is None:
             return
 
-        self._last_combo_name = combo.combo_type
+        self._last_combo_name = combo
         self.bullets.extend(fired_bullets)
 
     def _fire_player_weapons(self, dt: float, keys_pressed: object | None = None) -> None:
@@ -261,7 +260,7 @@ class GameScene(Scene):
         self.bullets.extend(fired_bullets)
 
     def _update_drones(self, dt: float) -> None:
-        """Update the composed DroneManager and collect drone-fired bullets."""
+        """Update PlayerShip-owned drones and collect their emitted bullets."""
         enemy_bullets = [
             bullet
             for bullet in self.bullets
@@ -284,24 +283,24 @@ class GameScene(Scene):
         for fc_item in self.fc_items:
             if getattr(fc_item, "active", True):
                 fc_item.update(dt)
-        self._update_explosions(dt)
+        self._update_effects(dt)
 
-    def _update_explosions(self, dt: float) -> None:
-        """Advance explosion VFX and remove completed animations."""
-        for explosion in self.explosions:
-            if getattr(explosion, "active", True):
-                explosion.update(dt)
-        self.explosions = [explosion for explosion in self.explosions if getattr(explosion, "active", False)]
+    def _update_effects(self, dt: float) -> None:
+        """Advance generic effects and remove completed animations."""
+        for effect in self.effects:
+            if getattr(effect, "active", True):
+                effect.update(dt)
+        self.effects = [effect for effect in self.effects if getattr(effect, "active", False)]
 
     def _spawn_enemy_death_explosions(self) -> None:
-        """Create one explosion effect for each enemy that died this frame."""
+        """Create one generic explosion effect for each enemy that died this frame."""
         for enemy in self.wave_manager.enemies_alive:
             if getattr(enemy, "active", True) or getattr(enemy, "_death_explosion_spawned", False):
                 continue
             enemy._death_explosion_spawned = True
             effect_size = max(int(enemy.width), int(enemy.height), 44) + 18
-            self.explosions.append(
-                ExplosionEffect(
+            self.effects.append(
+                Effect(
                     enemy.x + enemy.width / 2 - effect_size / 2,
                     enemy.y + enemy.height / 2 - effect_size / 2,
                     effect_size,
@@ -318,6 +317,57 @@ class GameScene(Scene):
             for enemy in self.wave_manager.enemies_alive
             if getattr(enemy, "active", False) and enemy.is_alive()
         ]
+
+    def _check_collisions(self) -> None:
+        """Resolve bullets, ramming enemies, and FC pickups during scene update."""
+        self.player.set_auto_targets(self.wave_manager.enemies_alive)
+        for bullet in self.bullets:
+            if not getattr(bullet, "active", True):
+                continue
+            if getattr(bullet, "owner", "player") == "enemy":
+                if bullet.get_rect().colliderect(self.player.get_rect()):
+                    bullet.on_hit(self.player)
+                    self.player.on_player_hit()
+                continue
+            bullet.fever_active = self.player.fever_active
+            self._check_player_bullet_collision(bullet)
+
+        player_rect = self.player.get_rect()
+        for enemy in self.wave_manager.enemies_alive:
+            if not getattr(enemy, "active", True) or not player_rect.colliderect(enemy.get_rect()):
+                continue
+            damage = int(getattr(enemy, "collision_damage", 0))
+            if damage > 0:
+                self.player.take_damage(damage)
+                enemy.hp = 0
+                enemy.active = False
+                self.player.on_player_hit()
+
+        for item in self.fc_items:
+            if getattr(item, "active", True) and player_rect.colliderect(item.get_rect()):
+                self.player.add_fc(item.collect())
+                self.player.on_fc_collected()
+
+    def _check_player_bullet_collision(self, bullet: Bullet) -> None:
+        """Apply player bullet damage and collect enemy drops into scene state."""
+        hit_rect = bullet.get_rect()
+        if (bullet.is_aoe or bullet.aoe_radius > 0) and bullet.aoe_radius > 0:
+            hit_rect = hit_rect.inflate(int(bullet.aoe_radius) * 2, int(bullet.aoe_radius) * 2)
+        for enemy in self.wave_manager.enemies_alive:
+            if not getattr(enemy, "active", True) or not hit_rect.colliderect(enemy.get_rect()):
+                continue
+            was_alive = enemy.is_alive()
+            base_damage = bullet.damage
+            bullet.damage = base_damage * self.player.get_damage_multiplier()
+            try:
+                drops = bullet.on_hit(enemy)
+            finally:
+                bullet.damage = base_damage
+            if was_alive and not enemy.is_alive():
+                self.player.score += int(getattr(enemy, "score_value", 1))
+                self.fc_items.extend(drops)
+            if not getattr(bullet, "active", True):
+                return
 
     def _notify_bosses_of_minion_deaths(self) -> None:
         """Keep ChickenOverlord healing lists aligned after collision damage."""
@@ -482,9 +532,9 @@ class GameScene(Scene):
         for bullet in self.bullets:
             if getattr(bullet, "active", True):
                 bullet.render(surface)
-        for explosion in self.explosions:
-            if getattr(explosion, "active", True):
-                explosion.render(surface)
+        for effect in self.effects:
+            if getattr(effect, "active", True):
+                effect.render(surface)
         for drone in self.player.drones:
             if getattr(drone, "active", True):
                 drone.render(surface)

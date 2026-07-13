@@ -6,7 +6,7 @@ from math import sin
 from typing import Sequence
 
 from src.entities.bullet import Bullet
-from src.entities.feather_core import FeatherCore
+from src.entities.pickup import Pickup
 from src.enemies.enemy import Enemy
 from src.utils.constants import MIN_HEALTH
 from src.weapons.weapon import WeaponType
@@ -96,7 +96,7 @@ class DodgeHen(Enemy):
         amount: int,
         weapon_type: WeaponType | None = None,
         is_aoe: bool = False,
-    ) -> list[FeatherCore]:
+    ) -> list[Pickup]:
         """Only accept damage from AOE Missile bullets; ignore all other hits."""
         if amount <= MIN_HEALTH or not self.active:
             return []
@@ -105,7 +105,7 @@ class DodgeHen(Enemy):
 
         return super().take_damage(amount)
 
-    def on_death(self) -> list[FeatherCore]:
+    def on_death(self) -> list[Pickup]:
         """Overrides on_death() to drop 5-8 Feather Cores."""
         return self.drop_fc()
 

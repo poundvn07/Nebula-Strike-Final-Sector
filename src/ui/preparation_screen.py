@@ -9,15 +9,11 @@ import pygame
 
 from src.core.game_scene import GameScene
 from src.core.scene_manager import Scene, SceneManager
-from src.systems.resource_manager import (
-    DRONE_SUMMON_COST,
-    LIFE_PURCHASE_COST,
-    REPAIR_FC_CHUNK,
-    ResourceManager,
-    WEAPON_SHOP_TYPES,
-)
 from src.systems.save_manager import SaveManager
 from src.utils.constants import SCREEN_HEIGHT, SCREEN_WIDTH
+from src.weapons.laser_cannon import LaserCannon
+from src.weapons.missile_salvo import MissileSalvo
+from src.weapons.plasma_spread import PlasmaSpread
 
 if TYPE_CHECKING:
     from src.entities.drone import Drone
@@ -67,6 +63,18 @@ BEGIN_BUTTON_RECT = pygame.Rect(PREP_CENTER_X - 115, SCREEN_HEIGHT - 76, 230, 44
 REPAIR_BUTTON_RECT = pygame.Rect(SECTION_RIGHT_X, REPAIR_SECTION_Y + 28, BUTTON_WIDTH, BUTTON_HEIGHT)
 LIFE_BUTTON_RECT = pygame.Rect(SECTION_RIGHT_X, REPAIR_SECTION_Y + 70, BUTTON_WIDTH, BUTTON_HEIGHT)
 FEEDBACK_Y = SCREEN_HEIGHT - 106
+DRONE_SUMMON_COST = 30
+LIFE_PURCHASE_COST = 160
+MAX_PURCHASED_LIVES = 5
+REPAIR_FC_CHUNK = 10
+WEAPON_SHOP_ORDER = ("LASER_CANNON", "PLASMA_SPREAD", "MISSILE_SALVO")
+WEAPON_SHOP_TYPES = {
+    "LASER_CANNON": LaserCannon,
+    "PLASMA_SPREAD": PlasmaSpread,
+    "MISSILE_SALVO": MissileSalvo,
+}
+WEAPON_PURCHASE_COSTS = {"LASER_CANNON": 60, "PLASMA_SPREAD": 95, "MISSILE_SALVO": 130}
+WEAPON_UNLOCK_MAPS = {"LASER_CANNON": 1, "PLASMA_SPREAD": 1, "MISSILE_SALVO": 3}
 
 
 ButtonAction = Callable[[], bool]
@@ -81,14 +89,12 @@ class PreparationScene(Scene):
         scene_manager: SceneManager,
         save_manager: SaveManager | None = None,
         game_state: dict | None = None,
-        resource_manager: ResourceManager | None = None,
     ) -> None:
         """Initialize the preparation scene with player state and scene transition hooks."""
         self.player = player
         self.scene_manager = scene_manager
         self.save_manager = save_manager or SaveManager()
         self.game_state = dict(game_state or {"current_map": 1, "highest_wave_reached": 1})
-        self.resource_manager = resource_manager or ResourceManager()
         self.feedback_text = ""
         self.feedback_color = PREP_ERROR_COLOR
         self._buttons: list[dict[str, object]] = []
@@ -204,7 +210,7 @@ class PreparationScene(Scene):
         small_font = self._get_small_font()
         current_map = int(self.game_state.get("current_map", 1))
         _blit_centered(surface, font.render("Weapon Shop", True, PREP_TEXT_COLOR), SECTION_MIDDLE_X + SECTION_WIDTH // 2, SHOP_HEADING_Y)
-        for row_index, item in enumerate(self.resource_manager.get_weapon_shop_items(current_map)):
+        for row_index, item in enumerate(get_weapon_shop_items(current_map)):
             y = SHOP_BODY_Y + row_index * SHOP_ROW_HEIGHT
             unlocked = bool(item["unlocked"])
             name = str(item["name"])
@@ -297,29 +303,28 @@ class PreparationScene(Scene):
         self._buttons.append({"rect": rect, "label": label, "cost": cost, "action": action, "enabled": enabled})
 
     def _upgrade_slot(self, slot_index: int) -> bool:
-        """Upgrade one weapon slot through ResourceManager."""
-        return self.resource_manager.upgrade_weapon(self.player, slot_index)
+        """Upgrade one weapon slot through PlayerShip's owned loadout state."""
+        return self.player.upgrade_weapon(slot_index)
 
     def _summon_drone(self, drone_type: type[Drone]) -> bool:
         """Summon one replacement drone."""
-        return self.resource_manager.summon_drone(self.player, drone_type) is not None
+        return self.player.summon_drone(drone_type) is not None
 
     def _unlock_drone(self, drone_type: type[Drone]) -> bool:
         """Unlock one drone type."""
-        return self.resource_manager.unlock_drone_type(self.player, drone_type)
+        return self.player.unlock_drone(drone_type)
 
     def _repair_ship(self) -> bool:
         """Repair one 20 percent HP chunk."""
-        return self.resource_manager.repair_ship(self.player, REPAIR_FC_CHUNK) > 0
+        return self.player.repair(REPAIR_FC_CHUNK) > 0
 
     def _purchase_life(self) -> bool:
-        """Buy one extra life through ResourceManager."""
-        return self.resource_manager.purchase_life(self.player)
+        """Buy one extra life through PlayerShip's persistent state."""
+        return self.player.purchase_life(LIFE_PURCHASE_COST, MAX_PURCHASED_LIVES)
 
     def _purchase_weapon(self, weapon_key: str, slot_index: int) -> bool:
         """Buy a new weapon and equip or replace the selected slot."""
-        current_map = int(self.game_state.get("current_map", 1))
-        return self.resource_manager.purchase_weapon(self.player, weapon_key, slot_index, current_map)
+        return purchase_weapon(self.player, weapon_key, slot_index, int(self.game_state.get("current_map", 1)))
 
     def _can_purchase_weapon_for_slot(self, weapon_key: str, slot_index: int) -> bool:
         """Return whether a shop button can change the selected weapon slot."""
@@ -339,7 +344,6 @@ class PreparationScene(Scene):
                 self.save_manager,
                 self.game_state,
                 scene_manager=self.scene_manager,
-                resource_manager=self.resource_manager,
             )
         )
         return True
@@ -369,32 +373,56 @@ def _blit_centered(surface: pygame.Surface, rendered: pygame.Surface, center_x: 
 
 
 class PreparationScreen:
-    """Compatibility facade that delegates FC spending to ResourceManager."""
-
-    def __init__(self, resource_manager: ResourceManager | None = None) -> None:
-        """Initialize with a ResourceManager used for all FC spending actions."""
-        self.resource_manager = resource_manager or ResourceManager()
+    """Small preparation API kept for callers that do not render a scene."""
 
     def repair_ship(self, player: PlayerShip, fc_amount: int) -> int:
         """Spend FC to repair the player ship."""
-        return self.resource_manager.repair_ship(player, fc_amount)
+        return player.repair(fc_amount)
 
     def upgrade_weapon(self, player: PlayerShip, slot: int, weapon: Weapon | None = None) -> bool:
         """Spend FC to upgrade a selected weapon."""
-        return self.resource_manager.upgrade_weapon(player, slot, weapon)
+        return player.upgrade_weapon(slot, weapon)
 
     def summon_drone(self, player: PlayerShip, drone_type: type[Drone]) -> Drone | None:
         """Spend FC to summon one drone."""
-        return self.resource_manager.summon_drone(player, drone_type)
+        return player.summon_drone(drone_type)
 
     def unlock_drone_type(self, player: PlayerShip, drone_type: type[Drone]) -> bool:
         """Spend FC to unlock a drone type."""
-        return self.resource_manager.unlock_drone_type(player, drone_type)
+        return player.unlock_drone(drone_type)
 
     def purchase_life(self, player: PlayerShip) -> bool:
         """Spend FC to buy one extra life."""
-        return self.resource_manager.purchase_life(player)
+        return player.purchase_life(LIFE_PURCHASE_COST, MAX_PURCHASED_LIVES)
 
     def purchase_weapon(self, player: PlayerShip, weapon_key: str, slot: int, current_map: int) -> bool:
         """Spend FC to equip a new weapon into a selected slot."""
-        return self.resource_manager.purchase_weapon(player, weapon_key, slot, current_map)
+        return purchase_weapon(player, weapon_key, slot, current_map)
+
+
+def get_weapon_shop_items(current_map: int) -> list[dict[str, object]]:
+    """Build the unchanged map-gated weapon catalog for the preparation UI."""
+    return [
+        {
+            "key": key,
+            "name": weapon_class().name,
+            "cost": WEAPON_PURCHASE_COSTS[key],
+            "unlock_map": WEAPON_UNLOCK_MAPS[key],
+            "unlocked": current_map >= WEAPON_UNLOCK_MAPS[key],
+        }
+        for key, weapon_class in ((key, WEAPON_SHOP_TYPES[key]) for key in WEAPON_SHOP_ORDER)
+    ]
+
+
+def purchase_weapon(player: PlayerShip, weapon_key: str, slot_index: int, current_map: int) -> bool:
+    """Spend FC and equip the selected preparation-shop weapon without a manager."""
+    weapon_class = WEAPON_SHOP_TYPES.get(weapon_key)
+    if weapon_class is None or slot_index < 0 or slot_index >= len(player.weapon_slots):
+        return False
+    if current_map < WEAPON_UNLOCK_MAPS[weapon_key] or isinstance(player.weapon_slots[slot_index], weapon_class):
+        return False
+    cost = WEAPON_PURCHASE_COSTS[weapon_key]
+    if not player.spend_fc(cost):
+        return False
+    player.equip_weapon(weapon_class(), slot_index)
+    return True

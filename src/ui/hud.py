@@ -9,9 +9,9 @@ from typing import Protocol
 import pygame
 
 from src.entities.support_drone import SupportDrone
-from src.utils.assets import load_sprite
+from src.utils.resource import load_sprite
 from src.utils.constants import MAX_ACTIVE_DRONES, SCREEN_HEIGHT, SCREEN_WIDTH
-from src.weapons.combo_effect import ComboType
+from src.weapons.weapon import ComboType
 
 HUD_TEXT_COLOR = (235, 244, 255)
 HUD_MUTED_COLOR = (145, 155, 175)
@@ -74,7 +74,7 @@ DRONE_COLORS = {
 
 
 class FeverStatus(Protocol):
-    """Protocol for read-only Fever Mode state exposed by ResourceManager."""
+    """Protocol for read-only Fever Mode state exposed by PlayerShip."""
 
     fever_active: bool
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from random import randint
 
 from src.entities.bullet import Bullet
-from src.entities.feather_core import FeatherCore
+from src.entities.pickup import Pickup
 from src.enemies.chicken_grunt import ChickenGrunt
 from src.enemies.enemy import Enemy
 from src.utils.constants import SCREEN_WIDTH
@@ -134,7 +134,7 @@ class ChickenOverlord(Enemy):
         if minion in self.minions_alive:
             self.minions_alive.remove(minion)
 
-    def on_death(self) -> list[FeatherCore]:
+    def on_death(self) -> list[Pickup]:
         """Override on_death() to drop configured Feather Cores."""
         drop_count = randint(int(self.fc_drop_min), int(self.fc_drop_max))
         return [self._create_feather_core(drop_index) for drop_index in range(drop_count)]

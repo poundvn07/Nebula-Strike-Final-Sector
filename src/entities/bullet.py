@@ -7,7 +7,7 @@ from typing import Literal, TYPE_CHECKING
 import pygame
 
 from src.entities.game_object import GameObject
-from src.utils.assets import load_sprite
+from src.utils.resource import load_sprite
 from src.utils.constants import MIN_HEALTH, SCREEN_HEIGHT, SCREEN_WIDTH
 
 if TYPE_CHECKING:
@@ -43,14 +43,14 @@ class Bullet(GameObject):
       aoe_radius: int
       debuffs: dict               {debuff_name: duration_seconds}
       chain_count: int
-      combo_targets: list         populated by ComboEffect.apply()
+      combo_targets: list         populated by PlayerShip combo activation
     Removed legacy aliases: explodes, explosion_radius, is_enemy_projectile,
                             piercing, debuff (str), chain_targets
 
     GameObject projectile that carries owner, damage, and weapon effect data.
     """
 
-    # NOTE: external callers may use legacy name — fix in CollisionSystem Phase 3
+    # NOTE: external callers may use legacy name while GameScene owns collisions.
 
     def __init__(
         self,

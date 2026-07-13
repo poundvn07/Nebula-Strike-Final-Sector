@@ -14,7 +14,7 @@ from src.utils.constants import MIN_HEALTH
 
 if TYPE_CHECKING:
     from src.enemies.enemy import Enemy
-    from src.entities.feather_core import FeatherCore
+    from src.entities.pickup import Pickup
     from src.entities.player_ship import PlayerShip
 
 DRONE_WIDTH = 32
@@ -68,7 +68,7 @@ class Drone(GameObject):
         dt: float,
         player: PlayerShip,
         enemies: list[Enemy],
-        fc_items: list[FeatherCore],
+        fc_items: list[Pickup],
     ) -> list[object]:
         """Run subclass-specific drone behavior and return emitted gameplay objects."""
 
@@ -116,7 +116,7 @@ class Drone(GameObject):
         if self._sprite is not None:
             return self._sprite
 
-        from src.utils.assets import load_sprite
+        from src.utils.resource import load_sprite
         loaded = load_sprite("drone", (DRONE_WIDTH, DRONE_HEIGHT))
         self._sprite = loaded
         return self._sprite

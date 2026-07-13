@@ -6,7 +6,7 @@ from math import hypot
 from typing import TYPE_CHECKING
 
 from src.entities.drone import DRONE_DEFAULT_SUMMON_COST, Drone
-from src.entities.feather_core import FeatherCore
+from src.entities.pickup import Pickup
 from src.entities.game_object import GameObject
 
 if TYPE_CHECKING:
@@ -34,14 +34,14 @@ class SupportDrone(Drone):
             orbit_radius=SUPPORT_DRONE_ORBIT_RADIUS,
             fc_cost_to_summon=DRONE_DEFAULT_SUMMON_COST,
         )
-        self.target_fc: FeatherCore | None = None
+        self.target_fc: Pickup | None = None
 
     def update_behavior(
         self,
         dt: float,
         player: PlayerShip,
         enemies: list[GameObject],
-        fc_items: list[FeatherCore],
+        fc_items: list[Pickup],
     ) -> list[object]:
         """Move toward the nearest distant FC pickup and collect it for the player."""
         self.target_fc = self._nearest_distant_fc(player, fc_items)
@@ -58,8 +58,8 @@ class SupportDrone(Drone):
     def _nearest_distant_fc(
         self,
         player: PlayerShip,
-        fc_items: list[FeatherCore],
-    ) -> FeatherCore | None:
+        fc_items: list[Pickup],
+    ) -> Pickup | None:
         """Return the nearest active FC outside the player's pickup radius."""
         candidates = [
             fc_item
@@ -72,7 +72,7 @@ class SupportDrone(Drone):
             return None
         return min(candidates, key=lambda fc_item: _distance(self, fc_item))
 
-    def _move_toward_fc(self, dt: float, fc_item: FeatherCore) -> None:
+    def _move_toward_fc(self, dt: float, fc_item: Pickup) -> None:
         """Move the drone toward a target FC pickup."""
         dx = fc_item.x - self.x
         dy = fc_item.y - self.y

@@ -38,14 +38,8 @@ class Game:
         while self.running:
             dt = self.clock.tick(FPS) / MILLISECONDS_PER_SECOND
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                elif self.current_scene is not None:
-                    self.current_scene.handle_event(event)
-
-            if self.current_scene is not None:
-                self.current_scene.update(dt)
+            self.handle_events()
+            self.update(dt)
 
             self.screen.fill(BACKGROUND_COLOR)
             if self.current_scene is not None:
@@ -53,3 +47,16 @@ class Game:
             pygame.display.flip()
 
         pygame.quit()
+
+    def handle_events(self) -> None:
+        """Own pygame event polling and forward input to the active scene."""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            elif self.current_scene is not None:
+                self.current_scene.handle_event(event)
+
+    def update(self, dt: float) -> None:
+        """Advance the current scene after its events have been handled."""
+        if self.current_scene is not None:
+            self.current_scene.update(dt)

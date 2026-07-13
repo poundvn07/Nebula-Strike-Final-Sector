@@ -35,11 +35,18 @@ _WEAPON_STATS_CACHE: dict[str, WeaponLevelStats] | None = None
 
 
 class WeaponType(Enum):
-    """Enum identifying the three remaining weapon families."""
+    """Enum identifying weapon families used by concrete weapon subclasses."""
 
     LASER = "LASER"
     PLASMA = "PLASMA"
     MISSILE = "MISSILE"
+
+
+class ComboType(Enum):
+    """Names the supported two-weapon attacks resolved by PlayerShip."""
+
+    ION_BEAM = "ION_BEAM"
+    HOMING_NOVA = "HOMING_NOVA"
 
 
 class Weapon(ABC):

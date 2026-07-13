@@ -11,18 +11,17 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.core.game_scene import GameScene
 from src.core.scene_manager import SceneManager
-from src.entities.attack_drone import AttackDrone
 from src.entities.player_ship import PlayerShip
-from src.entities.shield_drone import ShieldDrone
-from src.systems.resource_manager import (
+from src.entities.support_drone import SupportDrone
+from src.ui.preparation_screen import (
     LIFE_PURCHASE_COST,
     MAX_PURCHASED_LIVES,
     WEAPON_PURCHASE_COSTS,
-    ResourceManager,
+    purchase_weapon,
 )
 from src.systems.save_manager import SaveManager
 from src.ui.result_screen import ResultScene
-from src.weapons.ice_bolt import IceBolt
+from src.utils.constants import MAP_COUNT
 from src.weapons.laser_cannon import LaserCannon
 from src.weapons.missile_salvo import MissileSalvo
 from src.weapons.plasma_spread import PlasmaSpread
@@ -42,9 +41,8 @@ def test_save_and_load_roundtrip(save_path: Path) -> None:
     player.weapon_slots[1] = PlasmaSpread()
     player.weapon_slots[2] = MissileSalvo()
     player.select_weapon_slot(2)
-    player.drone_manager.unlocked_drone_types.add(ShieldDrone)
-    player.unlocked_drones = player.drone_manager.unlocked_drone_types
-    player.drones.append(AttackDrone(player))
+    player.unlocked_drones.add(SupportDrone)
+    player.drones.append(SupportDrone(player))
     game_state = {
         "current_map": 2,
         "highest_wave_reached": 4,
@@ -66,8 +64,8 @@ def test_save_and_load_roundtrip(save_path: Path) -> None:
     assert data["weapon_slots"][1] == {"type": "PLASMA_SPREAD", "level": 1}
     assert data["weapon_slots"][2] == {"type": "MISSILE_SALVO", "level": 1}
     assert data["active_weapon_slot"] == 2
-    assert data["drones_active"] == [{"type": "ATTACK_DRONE"}]
-    assert "SHIELD_DRONE" in data["unlocked_drone_types"]
+    assert data["drones_active"] == [{"type": "SUPPORT_DRONE"}]
+    assert "SUPPORT_DRONE" in data["unlocked_drone_types"]
 
     restored_player = PlayerShip()
     save_manager.apply_to_player(data, restored_player)
@@ -81,8 +79,8 @@ def test_save_and_load_roundtrip(save_path: Path) -> None:
     assert isinstance(restored_player.weapon_slots[1], PlasmaSpread)
     assert isinstance(restored_player.weapon_slots[2], MissileSalvo)
     assert restored_player.active_weapon_slot == 2
-    assert any(isinstance(drone, AttackDrone) for drone in restored_player.drones)
-    assert ShieldDrone in restored_player.unlocked_drones
+    assert any(isinstance(drone, SupportDrone) for drone in restored_player.drones)
+    assert SupportDrone in restored_player.unlocked_drones
 
 
 def test_load_missing_file(save_path: Path) -> None:
@@ -164,6 +162,28 @@ def test_retry_reactivates_defeated_player(save_path: Path) -> None:
     assert player.hp == player.max_hp
 
 
+def test_result_scene_uses_victory_background_after_final_map(monkeypatch: object) -> None:
+    """Only completing the final map selects the dedicated victory background."""
+    requested_keys: list[str] = []
+    scene = ResultScene(PlayerShip(), SceneManager(), won=True, game_state={"current_map": MAP_COUNT})
+
+    monkeypatch.setattr("src.ui.result_screen.load_sprite", lambda key, size: requested_keys.append(key) or object())
+    scene._render_outcome_background(type("Surface", (), {"blit": lambda *_: None})())
+
+    assert requested_keys == ["victory_background"]
+
+
+def test_result_scene_uses_defeat_background_after_full_reset(monkeypatch: object) -> None:
+    """A final-life loss selects the dedicated defeat background."""
+    requested_keys: list[str] = []
+    scene = ResultScene(PlayerShip(), SceneManager(), won=False, game_state={"current_map": 1})
+
+    monkeypatch.setattr("src.ui.result_screen.load_sprite", lambda key, size: requested_keys.append(key) or object())
+    scene._render_outcome_background(type("Surface", (), {"blit": lambda *_: None})())
+
+    assert requested_keys == ["defeat_background"]
+
+
 def test_game_scene_respawns_until_lives_are_empty(save_path: Path) -> None:
     """HP reaching zero consumes lives before the full reset/loss result."""
     player = PlayerShip()
@@ -205,53 +225,52 @@ def test_game_scene_final_life_resets_run(save_path: Path) -> None:
     assert isinstance(scene_manager.current_scene, ResultScene)
 
 
-def test_resource_manager_can_purchase_life() -> None:
-    """ResourceManager spends FC to buy one life up to the current cap."""
+def test_player_can_purchase_life() -> None:
+    """PlayerShip spends FC to buy one life up to the current cap."""
     player = PlayerShip()
     player.add_fc(LIFE_PURCHASE_COST)
 
-    assert ResourceManager().purchase_life(player) is True
+    assert player.purchase_life(LIFE_PURCHASE_COST, MAX_PURCHASED_LIVES) is True
     assert player.lives == 4
     assert player.fc_inventory == 0
 
     player.lives = MAX_PURCHASED_LIVES
     player.add_fc(LIFE_PURCHASE_COST)
 
-    assert ResourceManager().purchase_life(player) is False
+    assert player.purchase_life(LIFE_PURCHASE_COST, MAX_PURCHASED_LIVES) is False
     assert player.lives == MAX_PURCHASED_LIVES
 
 
-def test_resource_manager_weapon_shop_respects_map_gates() -> None:
-    """Ice unlocks before map 2 and can be bought into an empty slot."""
+def test_preparation_shop_respects_map_gates() -> None:
+    """Missile unlocks at map 3 and can be bought into an empty slot."""
     player = PlayerShip()
-    player.add_fc(WEAPON_PURCHASE_COSTS["ICE_BOLT"])
-    resource_manager = ResourceManager()
+    player.add_fc(WEAPON_PURCHASE_COSTS["MISSILE_SALVO"])
 
-    assert resource_manager.purchase_weapon(player, "ICE_BOLT", 1, current_map=1) is False
+    assert purchase_weapon(player, "MISSILE_SALVO", 1, current_map=1) is False
     assert player.weapon_slots[1] is None
-    assert player.fc_inventory == WEAPON_PURCHASE_COSTS["ICE_BOLT"]
+    assert player.fc_inventory == WEAPON_PURCHASE_COSTS["MISSILE_SALVO"]
 
-    assert resource_manager.purchase_weapon(player, "ICE_BOLT", 1, current_map=2) is True
-    assert isinstance(player.weapon_slots[1], IceBolt)
+    assert purchase_weapon(player, "MISSILE_SALVO", 1, current_map=3) is True
+    assert isinstance(player.weapon_slots[1], MissileSalvo)
     assert player.fc_inventory == 0
 
 
-def test_resource_manager_weapon_shop_can_replace_equipped_slot() -> None:
+def test_preparation_shop_can_replace_equipped_slot() -> None:
     """Map 3 shop can replace an equipped weapon with Missile Salvo."""
     player = PlayerShip()
     player.equip_weapon(LaserCannon(), 0)
     player.add_fc(WEAPON_PURCHASE_COSTS["MISSILE_SALVO"])
 
-    assert ResourceManager().purchase_weapon(player, "MISSILE_SALVO", 0, current_map=3) is True
+    assert purchase_weapon(player, "MISSILE_SALVO", 0, current_map=3) is True
     assert isinstance(player.weapon_slots[0], MissileSalvo)
     assert player.fc_inventory == 0
 
 
-def test_resource_manager_weapon_shop_can_fill_third_slot() -> None:
+def test_preparation_shop_can_fill_third_slot() -> None:
     """The preparation shop can buy a weapon into the third weapon slot."""
     player = PlayerShip()
     player.add_fc(WEAPON_PURCHASE_COSTS["PLASMA_SPREAD"])
 
-    assert ResourceManager().purchase_weapon(player, "PLASMA_SPREAD", 2, current_map=1) is True
+    assert purchase_weapon(player, "PLASMA_SPREAD", 2, current_map=1) is True
     assert isinstance(player.weapon_slots[2], PlasmaSpread)
     assert player.fc_inventory == 0

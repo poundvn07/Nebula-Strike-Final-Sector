@@ -14,10 +14,10 @@ from src.enemies.armored_rooster import ARMORED_ROOSTER_ARMOR_HITS, ARMORED_ROOS
 from src.enemies.chicken_grunt import ChickenGrunt
 from src.enemies.dodge_hen import DODGE_HEN_HP, DodgeHen
 from src.enemies.kamikaze import KAMIKAZE_DIVE_SPEED, KamikazeChicken
-from src.entities.feather_core import FeatherCore
+from src.entities.pickup import Pickup
 from src.entities.player_ship import PlayerShip
-from src.systems.collision_system import CollisionSystem
 from src.weapons.weapon import WeaponType
+from src.core.game_scene import GameScene
 
 
 def test_armored_rooster_armor() -> None:
@@ -37,11 +37,11 @@ def test_armored_rooster_armor() -> None:
     assert enemy.armor_intact is False
 
 
-def test_armored_rooster_ice_bypass() -> None:
-    """Ice damage bypasses armor and applies directly to HP."""
+def test_armored_rooster_aoe_bypass() -> None:
+    """AOE damage bypasses armor and applies directly to HP."""
     enemy = ArmoredRooster(100.0, 40.0)
 
-    enemy.take_damage(12, weapon_type=WeaponType.ICE)
+    enemy.take_damage(12, weapon_type=WeaponType.MISSILE, is_aoe=True)
 
     assert enemy.armor_hp == ARMORED_ROOSTER_ARMOR_HITS
     assert enemy.hp == ARMORED_ROOSTER_HP - 12
@@ -75,7 +75,9 @@ def test_kamikaze_body_collision_damages_player_and_self_destructs() -> None:
     player = PlayerShip()
     enemy = KamikazeChicken(player.x, player.y)
 
-    CollisionSystem().check_all(player, [], [enemy], [])
+    scene = GameScene(player)
+    scene.wave_manager.enemies_alive = [enemy]
+    scene._check_collisions()
 
     assert player.hp == player.max_hp - enemy.collision_damage
     assert enemy.active is False
@@ -89,12 +91,12 @@ def test_enemy_on_death_drops() -> None:
     for _ in range(10):
         drops = enemy.on_death()
         assert 1 <= len(drops) <= 2
-        assert all(isinstance(drop, FeatherCore) for drop in drops)
+        assert all(isinstance(drop, Pickup) for drop in drops)
 
 
-def test_feather_core_falls_downward() -> None:
-    """Dropped Feather Cores drift downward instead of staying fixed in place."""
-    core = FeatherCore(100.0, 40.0, value=1)
+def test_fc_pickup_falls_downward() -> None:
+    """Dropped FC pickups drift downward instead of staying fixed in place."""
+    core = Pickup(100.0, 40.0, value=1)
 
     core.update(1.0)
 

@@ -8,7 +8,7 @@ from src.core.scene_manager import Scene, SceneManager
 from src.entities.player_ship import PlayerShip
 from src.systems.save_manager import SaveManager
 from src.ui.preparation_screen import PreparationScene
-from src.utils.assets import play_sound
+from src.utils.resource import play_sound
 from src.utils.constants import SCREEN_WIDTH
 
 MENU_BG_COLOR = (6, 10, 20)

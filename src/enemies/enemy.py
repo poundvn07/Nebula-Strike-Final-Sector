@@ -10,9 +10,9 @@ from typing import TypeAlias
 import pygame
 
 from src.entities.bullet import Bullet
-from src.entities.feather_core import FeatherCore
+from src.entities.pickup import Pickup
 from src.entities.game_object import GameObject
-from src.utils.assets import load_enemy_sprite, play_sound
+from src.utils.resource import load_enemy_sprite, play_sound
 from src.utils.constants import MIN_HEALTH
 
 FormationOffset: TypeAlias = tuple[float, float]
@@ -64,7 +64,7 @@ class Enemy(GameObject):
         self.attack_cooldown = READY_ATTACK_COOLDOWN_SECONDS
         self.formation_time = READY_ATTACK_COOLDOWN_SECONDS
         self.last_attack_bullets: list[Bullet] = []
-        self.death_drops: list[FeatherCore] = []
+        self.death_drops: list[Pickup] = []
         self.render_color = DEFAULT_ENEMY_COLOR
 
     @abstractmethod
@@ -76,7 +76,7 @@ class Enemy(GameObject):
         """Attack and return configured enemy bullet stubs."""
 
     @abstractmethod
-    def on_death(self) -> list[FeatherCore]:
+    def on_death(self) -> list[Pickup]:
         """Return Feather Core drops for this enemy's death."""
 
     def update(self, dt: float) -> None:
@@ -94,7 +94,7 @@ class Enemy(GameObject):
             return
         surface.blit(sprite, self.get_rect())
 
-    def take_damage(self, amount: int) -> list[FeatherCore]:
+    def take_damage(self, amount: int) -> list[Pickup]:
         """Apply damage and return death drops when health reaches zero."""
         if amount <= MIN_HEALTH or not self.active:
             return []
@@ -108,7 +108,7 @@ class Enemy(GameObject):
             return self.death_drops
         return []
 
-    def drop_fc(self) -> list[FeatherCore]:
+    def drop_fc(self) -> list[Pickup]:
         """Create a random number of Feather Core pickups within the enemy drop range."""
         drop_count = randint(self.fc_drop_min, self.fc_drop_max)
         return [self._create_feather_core(drop_index) for drop_index in range(drop_count)]
@@ -146,9 +146,9 @@ class Enemy(GameObject):
         """Return whether this enemy currently has the STUNNED debuff."""
         return hasattr(self, "_active_debuffs") and "STUNNED" in self._active_debuffs
 
-    def _create_feather_core(self, drop_index: int) -> FeatherCore:
+    def _create_feather_core(self, drop_index: int) -> Pickup:
         """Create one configured Feather Core pickup."""
-        feather_core = FeatherCore(
+        feather_core = Pickup(
             x=self.x + drop_index * FEATHER_CORE_DROP_SPACING,
             y=self.y,
             value=FEATHER_CORE_UNIT_VALUE,

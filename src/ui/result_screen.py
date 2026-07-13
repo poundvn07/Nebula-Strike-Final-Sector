@@ -9,7 +9,8 @@ from src.core.scene_manager import Scene, SceneManager
 from src.entities.player_ship import PlayerShip
 from src.systems.save_manager import SaveManager
 from src.ui.preparation_screen import PreparationScene
-from src.utils.constants import SCREEN_WIDTH
+from src.utils.constants import MAP_COUNT, SCREEN_HEIGHT, SCREEN_WIDTH
+from src.utils.resource import load_sprite
 
 RESULT_BG_COLOR = (8, 12, 24)
 RESULT_TEXT_COLOR = (235, 242, 255)
@@ -72,6 +73,7 @@ class ResultScene(Scene):
     def render(self, surface: pygame.Surface) -> None:
         """Render win/loss copy and the next action button."""
         surface.fill(RESULT_BG_COLOR)
+        self._render_outcome_background(surface)
         title_text = f"Map {self.game_state.get('current_map', FIRST_MAP)} complete!" if self.won else "Map failed"
         title_color = RESULT_WIN_COLOR if self.won else RESULT_LOSE_COLOR
         _blit_centered(surface, self._get_title_font().render(title_text, True, title_color), RESULT_CENTER_X, RESULT_TITLE_Y)
@@ -85,6 +87,20 @@ class ResultScene(Scene):
         _blit_centered(surface, self._get_font().render(line_one, True, RESULT_TEXT_COLOR), RESULT_CENTER_X, RESULT_LINE_ONE_Y)
         _blit_centered(surface, self._get_font().render(line_two, True, RESULT_TEXT_COLOR), RESULT_CENTER_X, RESULT_LINE_TWO_Y)
         _draw_button(surface, RESULT_BUTTON_RECT, button_label, self._get_font())
+
+    def _render_outcome_background(self, surface: pygame.Surface) -> None:
+        """Draw the final-victory or full-reset defeat background when applicable."""
+        asset_key: str | None = None
+        if self.won and int(self.game_state.get("current_map", FIRST_MAP)) >= MAP_COUNT:
+            asset_key = "victory_background"
+        elif not self.won:
+            asset_key = "defeat_background"
+
+        if asset_key is None:
+            return
+        background = load_sprite(asset_key, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        if background is not None:
+            surface.blit(background, (0, 0))
 
     def _continue(self) -> None:
         """Continue to the next preparation scene."""

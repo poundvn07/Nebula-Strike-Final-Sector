@@ -11,12 +11,11 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.entities.bullet import Bullet
 from src.entities.player_ship import PlayerShip
-from src.systems.resource_manager import ResourceManager
-from src.weapons.combo_effect import ION_BEAM_AOE_RADIUS, ION_BEAM_DAMAGE_MULTIPLIER, ComboEffect, ComboType
+from src.entities.player_ship import ION_BEAM_AOE_RADIUS, ION_BEAM_DAMAGE_MULTIPLIER
 from src.weapons.laser_cannon import LaserCannon
 from src.weapons.missile_salvo import MissileSalvo
 from src.weapons.plasma_spread import PlasmaSpread
-from src.weapons.weapon import WeaponType
+from src.weapons.weapon import ComboType, WeaponType
 
 
 def _upgrade_to_max(weapon: object) -> None:
@@ -44,7 +43,7 @@ def test_weapon_upgrade_cost() -> None:
     player.weapon_slots[0] = weapon
     player.add_fc(100)
 
-    upgraded = ResourceManager().upgrade_weapon(player, 0)
+    upgraded = player.upgrade_weapon(0)
 
     assert upgraded is False
     assert player.fc_inventory == 100
@@ -64,15 +63,20 @@ def test_combo_resolution() -> None:
 
     combo = player.get_active_combo()
     assert combo is not None
-    assert combo.combo_type is ComboType.ION_BEAM
+    assert combo is ComboType.ION_BEAM
 
 
 def test_ion_beam_combo_is_capped() -> None:
     """Ion Beam keeps piercing/AOE behavior without full-damage wave-clearing reach."""
+    player = PlayerShip()
+    laser = LaserCannon()
+    plasma = PlasmaSpread()
+    _upgrade_to_max(laser)
+    _upgrade_to_max(plasma)
+    player.equip_weapon(laser, 0)
+    player.equip_weapon(plasma, 1)
     bullet = Bullet(damage=20)
-    combo = ComboEffect(WeaponType.LASER, WeaponType.PLASMA)
-
-    combo.apply([bullet], [])
+    player._apply_combo_to_bullets(ComboType.ION_BEAM, [bullet])
 
     assert bullet.is_piercing is True
     assert bullet.is_aoe is True
@@ -161,7 +165,7 @@ def test_combo_attack_requires_slot_pair_activation() -> None:
     bullets, combo = player.activate_combo(0, 1)
 
     assert combo is not None
-    assert combo.combo_type is ComboType.ION_BEAM
+    assert combo is ComboType.ION_BEAM
     assert len(bullets) == 4
     assert all(bullet.is_aoe for bullet in bullets)
 
