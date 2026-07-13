@@ -55,7 +55,6 @@ class PlayerShip(GameObject):
         super().__init__(x=x, y=y, width=PLAYER_WIDTH, height=PLAYER_HEIGHT, hp=PLAYER_MAX_HP)
         self.speed = speed
         self.weapon_slots: list[Weapon | None] = [None for _ in range(PLAYER_WEAPON_SLOT_COUNT)]
-        self.special_slot: Weapon | None = None
         initial_drones = list(drones or [])[:MAX_ACTIVE_DRONES]
         self.drone_mode = DroneMode.AUTO
         self.drones: list[Drone] = initial_drones
@@ -81,8 +80,6 @@ class PlayerShip(GameObject):
         for weapon in self.weapon_slots:
             if weapon is not None:
                 weapon.update_cooldown(dt)
-        if self.special_slot is not None:
-            self.special_slot.update_cooldown(dt)
 
     def update_drones(
         self,
@@ -137,7 +134,6 @@ class PlayerShip(GameObject):
         self.score = PLAYER_INITIAL_SCORE
         self.lives = PLAYER_STARTING_LIVES
         self.weapon_slots = [None for _ in range(PLAYER_WEAPON_SLOT_COUNT)]
-        self.special_slot = None
         self.active_weapon_slot = PLAYER_DEFAULT_ACTIVE_WEAPON_SLOT
         self.drone_mode = DroneMode.AUTO
         self.drones = []
@@ -219,15 +215,6 @@ class PlayerShip(GameObject):
             _sync_bullet_aliases(bullet)
         self.active_combo = combo
         return bullets, combo
-
-    def activate_skill(self) -> dict[str, object] | None:
-        """Trigger the special slot skill when its weapon cooldown is ready."""
-        if self.special_slot is None or not self.special_slot.can_fire():
-            return None
-
-        effect = self.special_slot.get_skill_effect()
-        self.special_slot.current_cooldown = self.special_slot.cooldown
-        return effect
 
     def equip_weapon(self, weapon: Weapon | None, slot_index: int) -> None:
         """Equip a weapon into one of the player weapon slots and recalculate combos."""

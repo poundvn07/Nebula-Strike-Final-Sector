@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
-from src.utils.constants import MISSILE_SALVO_BASE_DAMAGE
-from src.weapons.weapon import Direction, SkillEffect, Weapon, WeaponType
+from src.entities.bullet import Bullet 
+from src.utils.constants import MISSILE_SALVO_BASE_DAMAGE 
+from src.weapons.weapon import Direction, Weapon, WeaponType
 
 MISSILE_NAME = "Missile Salvo"
 MISSILE_STATS_KEY = "missile_salvo"
@@ -43,13 +43,3 @@ class MissileSalvo(Weapon):
         )
         self._start_cooldown()
         return [bullet]
-
-    def get_skill_effect(self) -> SkillEffect:
-        """Return the Barrage simultaneous missile metadata."""
-        return {
-            "name": "Barrage",
-            "effect": "missile_barrage",
-            "missile_count": MISSILE_BARRAGE_COUNT,
-            "targeting": MISSILE_BARRAGE_TARGETING,
-            "damage": self.damage,
-        }

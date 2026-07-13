@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
+from src.entities.bullet import Bullet
 from src.utils.constants import LASER_CANNON_BASE_DAMAGE
-from src.weapons.weapon import Direction, MAX_WEAPON_LEVEL, SkillEffect, Weapon, WeaponType
+from src.weapons.weapon import Direction, MAX_WEAPON_LEVEL, Weapon, WeaponType
 
 LASER_NAME = "Laser Cannon"
 LASER_STATS_KEY = "laser_cannon"
@@ -41,13 +41,3 @@ class LaserCannon(Weapon):
         )
         self._start_cooldown()
         return [bullet]
-
-    def get_skill_effect(self) -> SkillEffect:
-        """Return the Overcharge continuous all-screen beam metadata."""
-        return {
-            "name": "Overcharge",
-            "effect": "continuous_beam",
-            "coverage": "all_screen",
-            "duration": LASER_OVERCHARGE_DURATION_SECONDS,
-            "damage": self.damage * LASER_OVERCHARGE_DAMAGE_MULTIPLIER,
-        }

@@ -10,7 +10,7 @@ import pytest
 
 
 try:
-    import pygame  # noqa: F401
+    import pygame 
 except ModuleNotFoundError:
 
     class Rect:

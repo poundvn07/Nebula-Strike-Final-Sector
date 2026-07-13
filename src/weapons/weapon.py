@@ -9,10 +9,9 @@ from math import hypot
 from pathlib import Path
 from typing import TypeAlias
 
-from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
+from src.entities.bullet import Bullet 
 
 Direction: TypeAlias = tuple[float, float]
-SkillEffect: TypeAlias = dict[str, object]
 WeaponLevelStats: TypeAlias = dict[int, dict[str, int | float]]
 
 WEAPON_STATS_PATH = Path(__file__).resolve().parents[2] / "data" / "weapon_stats.json"
@@ -74,10 +73,6 @@ class Weapon(ABC):
     @abstractmethod
     def fire(self, origin_x: float, origin_y: float, direction: Direction) -> list[Bullet]:
         """Fire the weapon and return configured bullet stubs."""
-
-    @abstractmethod
-    def get_skill_effect(self) -> SkillEffect:
-        """Return metadata for this weapon's special skill effect."""
 
     def upgrade(self) -> bool:
         """Increase the weapon level if it is below level 3."""

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from math import cos, radians, sin
 
-from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
+from src.entities.bullet import Bullet
 from src.utils.constants import PLASMA_SPREAD_BASE_DAMAGE
-from src.weapons.weapon import Direction, MAX_WEAPON_LEVEL, SkillEffect, Weapon, WeaponType, normalize_direction
+from src.weapons.weapon import Direction, MAX_WEAPON_LEVEL, Weapon, WeaponType, normalize_direction
 
 PLASMA_NAME = "Plasma Spread"
 PLASMA_STATS_KEY = "plasma_spread"
@@ -56,15 +56,6 @@ class PlasmaSpread(Weapon):
         ]
         self._start_cooldown()
         return bullets
-
-    def get_skill_effect(self) -> SkillEffect:
-        """Return the Nova Burst large AOE explosion metadata."""
-        return {
-            "name": "Nova Burst",
-            "effect": "aoe_explosion",
-            "radius": PLASMA_NOVA_RADIUS,
-            "damage": self.damage * PLASMA_NOVA_DAMAGE_MULTIPLIER,
-        }
 
 
 def _rotate_direction(direction: Direction, degrees: float) -> Direction:

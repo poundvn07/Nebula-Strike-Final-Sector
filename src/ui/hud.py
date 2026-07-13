@@ -22,7 +22,6 @@ HUD_HP_GREEN = (60, 220, 100)
 HUD_HP_YELLOW = (245, 210, 60)
 HUD_HP_RED = (235, 70, 64)
 HUD_COOLDOWN_COLOR = (255, 255, 255, 110)
-HUD_SPECIAL_COLOR = (120, 190, 255)
 HUD_COMBO_COLOR = (120, 220, 255)
 HUD_WAVE_CLEAR_COLOR = (150, 255, 170)
 HUD_SHADOW_COLOR = (20, 20, 28)
@@ -51,7 +50,6 @@ WEAPON_SLOT_RECTS = (
     pygame.Rect(18, SCREEN_HEIGHT - 112, 260, 38),
     pygame.Rect(18, SCREEN_HEIGHT - 66, 260, 38),
 )
-SPECIAL_SLOT_RECT = pygame.Rect(SCREEN_WIDTH - 278, SCREEN_HEIGHT - 64, 260, 40)
 DRONE_START_X = SCREEN_WIDTH - 134
 DRONE_Y = SCREEN_HEIGHT - 96
 DRONE_SPACING = 36
@@ -196,13 +194,12 @@ class HUD:
             self._draw_text(surface, f"Wave {current_wave} / {total_waves}", WAVE_POSITION)
 
     def _draw_weapon_slots(self, surface: pygame.Surface, player: object) -> None:
-        """Draw bottom-left weapon slots and special skill slot."""
+        """Draw bottom-left weapon slots."""
         weapon_slots = list(getattr(player, "weapon_slots", []))
         active_slot = int(getattr(player, "active_weapon_slot", 0))
         for slot_index, rect in enumerate(WEAPON_SLOT_RECTS):
             weapon = weapon_slots[slot_index] if slot_index < len(weapon_slots) else None
             self._draw_weapon_slot(surface, rect, weapon, f"Weapon {slot_index + 1}", active=slot_index == active_slot)
-        self._draw_special_slot(surface, SPECIAL_SLOT_RECT, getattr(player, "special_slot", None))
 
     def _draw_weapon_slot(
         self,
@@ -227,22 +224,6 @@ class HUD:
         prefix = "ACTIVE " if active else ""
         self._draw_text(surface, f"{prefix}{name} {_stars(level)}", (rect.x + 8, rect.y + 7), small=True)
         self._draw_cooldown_pie(surface, rect, weapon)
-
-    def _draw_special_slot(self, surface: pygame.Surface, rect: pygame.Rect, special: object | None) -> None:
-        """Draw special skill name and cooldown bar."""
-        pygame.draw.rect(surface, HUD_PANEL_COLOR, rect)
-        if special is None:
-            self._draw_text(surface, "Special: Empty", (rect.x + 8, rect.y + 8), small=True)
-            return
-
-        name = str(getattr(special, "name", "Special"))
-        self._draw_text(surface, name, (rect.x + 8, rect.y + 6), small=True)
-        cooldown = float(getattr(special, "cooldown", 1.0))
-        current = float(getattr(special, "current_cooldown", 0.0))
-        ready_ratio = 1.0 - _clamp_ratio(current / cooldown) if cooldown > 0.0 else 1.0
-        bar_rect = pygame.Rect(rect.x + 8, rect.y + 28, rect.width - 16, 6)
-        pygame.draw.rect(surface, HUD_BAR_BACK_COLOR, bar_rect)
-        pygame.draw.rect(surface, HUD_SPECIAL_COLOR, pygame.Rect(bar_rect.x, bar_rect.y, int(bar_rect.width * ready_ratio), bar_rect.height))
 
     def _draw_cooldown_pie(self, surface: pygame.Surface, rect: pygame.Rect, weapon: object) -> None:
         """Draw a simple pie-fill overlay for weapon cooldown."""

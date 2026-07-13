@@ -26,7 +26,6 @@ SHIP_FULL_HP_PERCENT = 100.0
 WEAPON_SLOT_COUNT = PLAYER_WEAPON_SLOT_COUNT
 DEFAULT_STARTING_LOADOUT = {
     "weapon_slots": [{"type": "LASER_CANNON", "level": MIN_WEAPON_LEVEL}, None, None],
-    "special_slot": None,
     "active_weapon_slot": 0,
 }
 
@@ -84,7 +83,6 @@ class SaveManager:
         while len(player.weapon_slots) < WEAPON_SLOT_COUNT:
             player.weapon_slots.append(None)
 
-        player.special_slot = _deserialize_weapon(data.get("special_slot"))
         player.select_weapon_slot(_clamp_slot_index(data.get("active_weapon_slot", 0)))
         player.get_active_combo()
 
@@ -110,7 +108,6 @@ class SaveManager:
 
         for slot_index, weapon_data in enumerate(weapon_slots):
             player.equip_weapon(_deserialize_weapon(weapon_data), slot_index)
-        player.special_slot = _deserialize_weapon(loadout.get("special_slot"))
         player.select_weapon_slot(_clamp_slot_index(loadout.get("active_weapon_slot", 0)))
 
     def delete_save(self) -> None:
@@ -153,7 +150,6 @@ class SaveManager:
                 game_state.get("highest_wave_reached", DEFAULT_HIGHEST_WAVE_REACHED)
             ),
             "weapon_slots": [_serialize_weapon(weapon) for weapon in player.weapon_slots[:WEAPON_SLOT_COUNT]],
-            "special_slot": _serialize_weapon(player.special_slot),
             "active_weapon_slot": _clamp_slot_index(getattr(player, "active_weapon_slot", 0)),
             "drones_active": [_serialize_drone(drone) for drone in player.drones],
             "unlocked_drone_types": [
