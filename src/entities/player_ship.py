@@ -31,9 +31,6 @@ PLAYER_REPAIR_HP_PERCENT_PER_CHUNK = 0.20
 PLAYER_INITIAL_FC = 0
 PLAYER_INITIAL_SCORE = 0
 PLAYER_STARTING_LIVES = 3
-FEVER_STREAK_TRIGGER_COUNT = 10
-FEVER_DURATION_SECONDS = 5.0
-FEVER_DAMAGE_MULTIPLIER = 1.5
 NORMAL_DAMAGE_MULTIPLIER = 1.0
 DRONE_SUMMON_FC_COST = 30
 ION_BEAM_AOE_RADIUS = 16
@@ -73,8 +70,6 @@ class PlayerShip(GameObject):
         self.auto_targets: list[GameObject] = []
         self.active_combo: ComboType | None = None
         self.fc_streak_counter = PLAYER_INITIAL_FC
-        self.fever_active = False
-        self.fever_timer = 0.0
 
     @property
     def fc_inventory(self) -> int:
@@ -88,10 +83,6 @@ class PlayerShip(GameObject):
                 weapon.update_cooldown(dt)
         if self.special_slot is not None:
             self.special_slot.update_cooldown(dt)
-        if self.fever_active:
-            self.fever_timer = max(0.0, self.fever_timer - dt)
-            if self.fever_timer <= 0.0:
-                self.fever_active = False
 
     def update_drones(
         self,
@@ -153,8 +144,6 @@ class PlayerShip(GameObject):
         self.unlocked_drones = set()
         self.auto_targets = []
         self.fc_streak_counter = PLAYER_INITIAL_FC
-        self.fever_active = False
-        self.fever_timer = 0.0
         self.active_combo = None
 
     def move(self, keys_pressed: Mapping[int, bool] | Sequence[bool], dt: float) -> None:
@@ -376,19 +365,16 @@ class PlayerShip(GameObject):
         return MANUAL_FIRE_DIRECTION
 
     def on_fc_collected(self) -> None:
-        """Advance the FC collection streak and trigger its original Fever effect."""
+        """Advance the FC collection streak counter."""
         self.fc_streak_counter += 1
-        if self.fc_streak_counter >= FEVER_STREAK_TRIGGER_COUNT and not self.fever_active:
-            self.fever_active = True
-            self.fever_timer = FEVER_DURATION_SECONDS
 
     def on_player_hit(self) -> None:
         """Break the FC streak when the player takes collision damage."""
         self.fc_streak_counter = PLAYER_INITIAL_FC
 
     def get_damage_multiplier(self) -> float:
-        """Return the Fever damage multiplier without mutating weapon values."""
-        return FEVER_DAMAGE_MULTIPLIER if self.fever_active else NORMAL_DAMAGE_MULTIPLIER
+        """Return the current damage multiplier (always normal, fever removed)."""
+        return NORMAL_DAMAGE_MULTIPLIER
 
     def is_drone_unlocked(self, drone_type: type[Drone]) -> bool:
         """Return whether a drone class may be summoned by this ship."""

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import cos, radians, sin
-from typing import Protocol
 
 import pygame
 
@@ -24,7 +23,6 @@ HUD_HP_YELLOW = (245, 210, 60)
 HUD_HP_RED = (235, 70, 64)
 HUD_COOLDOWN_COLOR = (255, 255, 255, 110)
 HUD_SPECIAL_COLOR = (120, 190, 255)
-HUD_FEVER_COLOR = (255, 190, 40)
 HUD_COMBO_COLOR = (120, 220, 255)
 HUD_WAVE_CLEAR_COLOR = (150, 255, 170)
 HUD_SHADOW_COLOR = (20, 20, 28)
@@ -62,7 +60,6 @@ BOSS_BAR_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 220, 26, 440, 16)
 BOSS_NAME_POSITION = (SCREEN_WIDTH // 2 - 220, 6)
 CENTER_ALERT_Y = SCREEN_HEIGHT // 2 - 72
 ALERT_DURATION_SECONDS = 3.0
-FEVER_FLASH_INTERVAL_SECONDS = 0.2
 STAR_FILLED = "★"
 STAR_EMPTY = "☆"
 MAX_STARS = 3
@@ -73,10 +70,7 @@ DRONE_COLORS = {
 }
 
 
-class FeverStatus(Protocol):
-    """Protocol for read-only Fever Mode state exposed by PlayerShip."""
 
-    fever_active: bool
 
 
 @dataclass
@@ -86,7 +80,6 @@ class _TimedAlert:
     text: str
     color: tuple[int, int, int]
     timer: float = ALERT_DURATION_SECONDS
-    flashing: bool = False
 
 
 class HUD:
@@ -99,22 +92,17 @@ class HUD:
         self._alert_font: pygame.font.Font | None = None
         self._boss_font: pygame.font.Font | None = None
         self._alerts: dict[str, _TimedAlert] = {}
-        self._fever_was_active = False
         self._wave_clear_was_active = False
         self._shown_combo_names: set[str] = set()
-        self._fever_flash_timer = 0.0
-        self._fever_flash_visible = True
 
     def update(
         self,
         dt: float,
         *,
-        fever_status: FeverStatus | None = None,
         combo_name: object | None = None,
         wave_clear: bool = False,
     ) -> None:
         """Advance HUD timers and register transient read-only alerts."""
-        self._update_fever_alert(dt, fever_status)
         self._update_combo_alert(combo_name)
         if wave_clear and not self._wave_clear_was_active:
             self.show_wave_clear()
@@ -126,7 +114,6 @@ class HUD:
         surface: pygame.Surface,
         player: object | None = None,
         *,
-        fever_status: FeverStatus | None = None,
         current_wave: int | None = None,
         total_waves: int | None = None,
         boss: object | None = None,
@@ -134,7 +121,7 @@ class HUD:
         wave_clear: bool = False,
     ) -> None:
         """Draw the complete HUD overlay on top of the game scene."""
-        self.update(0.0, fever_status=fever_status, combo_name=combo_name, wave_clear=wave_clear)
+        self.update(0.0, combo_name=combo_name, wave_clear=wave_clear)
         if player is not None:
             self._draw_player_status(surface, player)
             self._draw_resource_status(surface, player, current_wave, total_waves)
@@ -142,10 +129,6 @@ class HUD:
             self._draw_drone_icons(surface, player)
         self._draw_boss_bar(surface, boss)
         self._draw_alerts(surface)
-
-    def show_fever(self) -> None:
-        """Show the Fever Mode alert for 3 seconds."""
-        self._alerts["fever"] = _TimedAlert("FEVER MODE!", HUD_FEVER_COLOR, flashing=True)
 
     def show_combo(self, combo_name: object) -> None:
         """Show the first-time combo alert for this HUD session."""
@@ -159,17 +142,7 @@ class HUD:
         """Show the wave clear alert for 3 seconds."""
         self._alerts["wave_clear"] = _TimedAlert("WAVE CLEAR!", HUD_WAVE_CLEAR_COLOR)
 
-    def _update_fever_alert(self, dt: float, fever_status: FeverStatus | None) -> None:
-        """Register Fever alert when Fever becomes active and tick its flash."""
-        fever_active = bool(getattr(fever_status, "fever_active", False)) if fever_status is not None else False
-        if fever_active and not self._fever_was_active:
-            self.show_fever()
-        self._fever_was_active = fever_active
 
-        self._fever_flash_timer += dt
-        if self._fever_flash_timer >= FEVER_FLASH_INTERVAL_SECONDS:
-            self._fever_flash_timer = 0.0
-            self._fever_flash_visible = not self._fever_flash_visible
 
     def _update_combo_alert(self, combo_name: object | None) -> None:
         """Register combo text once per combo name."""
@@ -331,8 +304,6 @@ class HUD:
         """Draw center alerts that fade after 3 seconds."""
         visible_alerts = list(self._alerts.values())
         for index, alert in enumerate(visible_alerts):
-            if alert.flashing and not self._fever_flash_visible:
-                continue
             alpha_ratio = _clamp_ratio(alert.timer / ALERT_DURATION_SECONDS)
             y = CENTER_ALERT_Y + index * 54
             self._draw_centered_alert(surface, alert.text, alert.color, y, alpha_ratio)

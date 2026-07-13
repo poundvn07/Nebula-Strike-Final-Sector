@@ -30,7 +30,6 @@ BULLET_POOL_DEFAULT_SIZE = 128
 CHAIN_DAMAGE_MULTIPLIER = 0.5
 PLAYER_BULLET_COLOR = (80, 220, 255)
 ENEMY_BULLET_COLOR = (255, 180, 80)
-FEVER_BULLET_COLOR = (255, 190, 40)
 
 
 class Bullet(GameObject):
@@ -125,7 +124,6 @@ class Bullet(GameObject):
         self.chain_count: int = chain_count
         self.combo_targets: list = []
         self.metadata: dict[str, object] = {}
-        self.fever_active = False
 
     def update(self, dt: float) -> None:
         """Move the bullet and deactivate it once it leaves the screen margin."""
@@ -153,10 +151,7 @@ class Bullet(GameObject):
             surface.blit(sprite, self.get_rect())
             return
 
-        if self.owner == PLAYER_BULLET_OWNER and getattr(self, "fever_active", False):
-            color = FEVER_BULLET_COLOR
-        else:
-            color = PLAYER_BULLET_COLOR if self.owner == PLAYER_BULLET_OWNER else ENEMY_BULLET_COLOR
+        color = PLAYER_BULLET_COLOR if self.owner == PLAYER_BULLET_OWNER else ENEMY_BULLET_COLOR
         pygame.draw.rect(surface, color, self.get_rect())
 
     def on_death(self) -> None:

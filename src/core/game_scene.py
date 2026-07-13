@@ -143,7 +143,7 @@ class GameScene(Scene):
             self._update_player(dt)
             self._update_wave_intro(dt)
             self._update_effects(dt)
-            self.hud.update(dt, fever_status=self.player, combo_name=self._last_combo_name)
+            self.hud.update(dt, combo_name=self._last_combo_name)
             return
 
         if self._respawn_invulnerable_timer > 0.0:
@@ -163,7 +163,7 @@ class GameScene(Scene):
         self._spawn_enemy_death_explosions()
         self._prune_inactive_objects()
         self._notify_bosses_of_minion_deaths()
-        self.hud.update(dt, fever_status=self.player, combo_name=self._last_combo_name)
+        self.hud.update(dt, combo_name=self._last_combo_name)
 
         if not self.player.is_alive():
             self._handle_player_defeat()
@@ -178,7 +178,6 @@ class GameScene(Scene):
         self.hud.render(
             surface,
             self.player,
-            fever_status=self.player,
             current_wave=self.wave_manager.current_wave,
             total_waves=self.total_waves,
             boss=self._get_active_boss(),
@@ -329,7 +328,6 @@ class GameScene(Scene):
                     bullet.on_hit(self.player)
                     self.player.on_player_hit()
                 continue
-            bullet.fever_active = self.player.fever_active
             self._check_player_bullet_collision(bullet)
 
         player_rect = self.player.get_rect()
