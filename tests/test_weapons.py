@@ -13,8 +13,8 @@ from src.entities.bullet import Bullet
 from src.entities.player_ship import PlayerShip
 from src.systems.resource_manager import ResourceManager
 from src.weapons.combo_effect import ION_BEAM_AOE_RADIUS, ION_BEAM_DAMAGE_MULTIPLIER, ComboEffect, ComboType
-from src.weapons.ice_bolt import IceBolt
 from src.weapons.laser_cannon import LaserCannon
+from src.weapons.missile_salvo import MissileSalvo
 from src.weapons.plasma_spread import PlasmaSpread
 from src.weapons.weapon import WeaponType
 
@@ -98,21 +98,21 @@ def test_player_has_three_weapon_slots_and_fires_only_active_slot() -> None:
     """Space should fire only the selected weapon instead of every owned weapon."""
     player = PlayerShip()
     player.equip_weapon(LaserCannon(), 0)
-    player.equip_weapon(IceBolt(), 1)
+    player.equip_weapon(MissileSalvo(), 1)
     player.select_weapon_slot(1)
 
     bullets = player.fire(0.1)
 
     assert len(player.weapon_slots) == 3
     assert len(bullets) == 1
-    assert bullets[0].weapon_type is WeaponType.ICE
+    assert bullets[0].weapon_type is WeaponType.MISSILE
 
 
 def test_tab_cycle_skips_empty_weapon_slots() -> None:
     """Cycling weapons should move through equipped slots in order."""
     player = PlayerShip()
     player.equip_weapon(LaserCannon(), 0)
-    player.equip_weapon(IceBolt(), 2)
+    player.equip_weapon(MissileSalvo(), 2)
 
     assert player.cycle_weapon_slot() == 2
     assert player.active_weapon_slot == 2

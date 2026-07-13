@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
+from src.entities.bullet import Bullet
 from src.entities.feather_core import FeatherCore
 from src.enemies.enemy import Enemy, FormationOffset
 

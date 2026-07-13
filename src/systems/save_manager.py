@@ -6,18 +6,13 @@ from json import JSONDecodeError, dump, load
 from pathlib import Path
 from typing import Any
 
-from src.entities.attack_drone import AttackDrone
-from src.entities.bomb_drone import BombDrone
 from src.entities.drone import Drone
 from src.entities.player_ship import PLAYER_WEAPON_SLOT_COUNT, PlayerShip
-from src.entities.shield_drone import ShieldDrone
 from src.entities.support_drone import SupportDrone
 from src.utils.constants import FIRST_MAP_INDEX, MAP_COUNT, MIN_HEALTH
-from src.weapons.ice_bolt import IceBolt
 from src.weapons.laser_cannon import LaserCannon
 from src.weapons.missile_salvo import MissileSalvo
 from src.weapons.plasma_spread import PlasmaSpread
-from src.weapons.thunder_rail import ThunderRail
 from src.weapons.weapon import MIN_WEAPON_LEVEL, Weapon
 
 SAVE_PATH = Path(__file__).resolve().parents[2] / "data" / "save_state.json"
@@ -38,15 +33,10 @@ DEFAULT_STARTING_LOADOUT = {
 WEAPON_TYPES: dict[str, type[Weapon]] = {
     "LASER_CANNON": LaserCannon,
     "PLASMA_SPREAD": PlasmaSpread,
-    "ICE_BOLT": IceBolt,
-    "THUNDER_RAIL": ThunderRail,
     "MISSILE_SALVO": MissileSalvo,
 }
 DRONE_TYPES: dict[str, type[Drone]] = {
-    "ATTACK_DRONE": AttackDrone,
-    "SHIELD_DRONE": ShieldDrone,
     "SUPPORT_DRONE": SupportDrone,
-    "BOMB_DRONE": BombDrone,
 }
 WEAPON_TYPE_NAMES = {weapon_class: type_name for type_name, weapon_class in WEAPON_TYPES.items()}
 DRONE_TYPE_NAMES = {drone_class: type_name for type_name, drone_class in DRONE_TYPES.items()}

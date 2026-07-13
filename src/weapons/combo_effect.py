@@ -10,13 +10,6 @@ from src.weapons.weapon import MAX_WEAPON_LEVEL, WeaponType
 
 ION_BEAM_AOE_RADIUS = 16
 ION_BEAM_DAMAGE_MULTIPLIER = 0.65
-CRYO_BURST_AOE_RADIUS = 80
-CRYO_BURST_SLOW_SECONDS = 3.0
-CRYO_BURST_FREEZE_SECONDS = 1.0
-STORM_FIELD_AOE_RADIUS = 60
-STORM_FIELD_SLOW_SECONDS = 2.0
-STORM_FIELD_STUN_SECONDS = 1.0
-VOLT_BEAM_CHAIN_COUNT = 3
 HOMING_NOVA_AOE_RADIUS = 50
 
 
@@ -24,17 +17,11 @@ class ComboType(Enum):
     """Enum describing supported tier 2 weapon combo effects."""
 
     ION_BEAM = "ION_BEAM"
-    CRYO_BURST = "CRYO_BURST"
-    STORM_FIELD = "STORM_FIELD"
-    VOLT_BEAM = "VOLT_BEAM"
     HOMING_NOVA = "HOMING_NOVA"
 
 
 COMBO_MAP: dict[frozenset[WeaponType], ComboType] = {
     frozenset((WeaponType.LASER, WeaponType.PLASMA)): ComboType.ION_BEAM,
-    frozenset((WeaponType.PLASMA, WeaponType.ICE)): ComboType.CRYO_BURST,
-    frozenset((WeaponType.ICE, WeaponType.THUNDER)): ComboType.STORM_FIELD,
-    frozenset((WeaponType.THUNDER, WeaponType.LASER)): ComboType.VOLT_BEAM,
     frozenset((WeaponType.MISSILE, WeaponType.PLASMA)): ComboType.HOMING_NOVA,
 }
 
@@ -70,12 +57,6 @@ class ComboEffect:
             bullet.combo_targets = list(targets)
             if self.combo_type is ComboType.ION_BEAM:
                 self._apply_ion_beam(bullet)
-            elif self.combo_type is ComboType.CRYO_BURST:
-                self._apply_cryo_burst(bullet)
-            elif self.combo_type is ComboType.STORM_FIELD:
-                self._apply_storm_field(bullet)
-            elif self.combo_type is ComboType.VOLT_BEAM:
-                self._apply_volt_beam(bullet)
             elif self.combo_type is ComboType.HOMING_NOVA:
                 self._apply_homing_nova(bullet)
 
@@ -88,46 +69,9 @@ class ComboEffect:
         bullet.aoe_radius = ION_BEAM_AOE_RADIUS
         bullet.damage *= ION_BEAM_DAMAGE_MULTIPLIER
 
-    def _apply_cryo_burst(self, bullet: Bullet) -> None:
-        """Add freeze AOE behavior for Plasma plus Ice."""
-        bullet.is_aoe = True
-        bullet.aoe_radius = CRYO_BURST_AOE_RADIUS
-        _merge_debuffs(
-            bullet,
-            {
-                "SLOWED": CRYO_BURST_SLOW_SECONDS,
-                "FROZEN": CRYO_BURST_FREEZE_SECONDS,
-            },
-        )
-
-    def _apply_storm_field(self, bullet: Bullet) -> None:
-        """Add slow and stun field behavior for Ice plus Thunder."""
-        bullet.is_aoe = True
-        bullet.aoe_radius = STORM_FIELD_AOE_RADIUS
-        _merge_debuffs(
-            bullet,
-            {
-                "SLOWED": STORM_FIELD_SLOW_SECONDS,
-                "STUNNED": STORM_FIELD_STUN_SECONDS,
-            },
-        )
-
-    def _apply_volt_beam(self, bullet: Bullet) -> None:
-        """Add piercing and chain behavior for Thunder plus Laser."""
-        bullet.is_piercing = True
-        bullet.chain_count = VOLT_BEAM_CHAIN_COUNT
-
     def _apply_homing_nova(self, bullet: Bullet) -> None:
         """Add homing and AOE behavior for Missile plus Plasma."""
         bullet.homing = True
         bullet.tracking_mode = "nearest_enemy"
         bullet.is_aoe = True
         bullet.aoe_radius = HOMING_NOVA_AOE_RADIUS
-
-
-def _merge_debuffs(bullet: Bullet, debuffs: dict[str, object]) -> None:
-    """Merge combo debuffs onto a Bullet stub without owning future hit logic."""
-    existing_debuffs = getattr(bullet, "debuffs", {})
-    merged_debuffs = dict(existing_debuffs)
-    merged_debuffs.update(debuffs)
-    bullet.debuffs = merged_debuffs

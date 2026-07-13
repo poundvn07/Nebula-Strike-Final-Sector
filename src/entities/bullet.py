@@ -141,7 +141,13 @@ class Bullet(GameObject):
 
     def render(self, surface: pygame.Surface) -> None:
         """Draw the bullet using projectile sprites, with color rectangles as fallback."""
-        sprite_key = "player_bullet" if self.owner == PLAYER_BULLET_OWNER else "enemy_bullet"
+        is_combo = getattr(self, "combo_type", None) is not None
+        if self.owner == PLAYER_BULLET_OWNER and is_combo:
+            sprite_key = "combo_bullet"
+        elif self.owner == PLAYER_BULLET_OWNER:
+            sprite_key = "player_bullet"
+        else:
+            sprite_key = "enemy_bullet"
         sprite = load_sprite(sprite_key, (int(self.width), int(self.height)))
         if sprite is not None:
             surface.blit(sprite, self.get_rect())

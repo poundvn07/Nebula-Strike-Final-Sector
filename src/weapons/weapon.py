@@ -35,12 +35,10 @@ _WEAPON_STATS_CACHE: dict[str, WeaponLevelStats] | None = None
 
 
 class WeaponType(Enum):
-    """Enum identifying the five polymorphic weapon families."""
+    """Enum identifying the three remaining weapon families."""
 
     LASER = "LASER"
     PLASMA = "PLASMA"
-    ICE = "ICE"
-    THUNDER = "THUNDER"
     MISSILE = "MISSILE"
 
 

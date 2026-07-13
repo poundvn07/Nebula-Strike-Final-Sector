@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
+from src.entities.bullet import Bullet
 from src.entities.feather_core import FeatherCore
 from src.enemies.enemy import Enemy
 from src.utils.constants import MIN_HEALTH
-from src.weapons.weapon import WeaponType
 
 ARMORED_ROOSTER_WIDTH = 66
 ARMORED_ROOSTER_HEIGHT = 61
@@ -49,7 +48,7 @@ class ArmoredRooster(Enemy):
 
     @property
     def armor_intact(self) -> bool:
-        """Return whether the armor layer is still absorbing non-ice hits."""
+        """Return whether the armor layer is still absorbing non-AOE hits."""
         return self.armor_hp > MIN_HEALTH
 
     def move(self, dt: float) -> None:
@@ -79,14 +78,14 @@ class ArmoredRooster(Enemy):
     def take_damage(
         self,
         amount: int,
-        weapon_type: WeaponType | None = None,
+        weapon_type: object = None,
         is_aoe: bool = False,
     ) -> list[FeatherCore]:
-        """Apply ice damage directly while armor absorbs other damage first."""
+        """Apply AOE damage directly while armor absorbs all other damage first."""
         if amount <= MIN_HEALTH or not self.active:
             return []
 
-        if weapon_type is not WeaponType.ICE and self.armor_intact:
+        if not is_aoe and self.armor_intact:
             self.armor_hp = max(MIN_HEALTH, self.armor_hp - 1)
             return []
 

@@ -8,10 +8,8 @@ from typing import Protocol
 
 import pygame
 
-from src.entities.attack_drone import AttackDrone
-from src.entities.bomb_drone import BombDrone
-from src.entities.shield_drone import ShieldDrone
 from src.entities.support_drone import SupportDrone
+from src.utils.assets import load_sprite
 from src.utils.constants import MAX_ACTIVE_DRONES, SCREEN_HEIGHT, SCREEN_WIDTH
 from src.weapons.combo_effect import ComboType
 
@@ -45,6 +43,8 @@ RIGHT_X = SCREEN_WIDTH - 238
 HP_BAR_RECT = pygame.Rect(18, 18, 230, 18)
 HP_TEXT_POSITION = (18, 42)
 LIVES_POSITION = (18, 66)
+LIVES_ICON_SIZE = (28, 28)
+LIVES_ICON_SPACING = 32
 FC_POSITION = (RIGHT_X, 18)
 SCORE_POSITION = (RIGHT_X, 42)
 WAVE_POSITION = (RIGHT_X, 66)
@@ -69,10 +69,7 @@ MAX_STARS = 3
 FC_ICON = "⚙"
 
 DRONE_COLORS = {
-    AttackDrone: (255, 110, 90),
-    ShieldDrone: (90, 180, 255),
     SupportDrone: (120, 240, 155),
-    BombDrone: (230, 170, 70),
 }
 
 
@@ -198,7 +195,17 @@ class HUD:
         fill_rect = pygame.Rect(HP_BAR_RECT.x, HP_BAR_RECT.y, int(HP_BAR_RECT.width * hp_ratio), HP_BAR_RECT.height)
         pygame.draw.rect(surface, _hp_color(hp_ratio), fill_rect)
         self._draw_text(surface, f"HP: {hp} / {max_hp}", HP_TEXT_POSITION)
-        self._draw_text(surface, f"Lives: {int(getattr(player, 'lives', 0))}", LIVES_POSITION, small=True)
+        self._draw_lives_icons(surface, int(getattr(player, "lives", 0)))
+
+    def _draw_lives_icons(self, surface: pygame.Surface, lives: int) -> None:
+        """Draw heart icon sprites for each remaining life."""
+        icon = load_sprite("lives_icon", LIVES_ICON_SIZE)
+        x, y = LIVES_POSITION
+        if icon is not None:
+            for i in range(lives):
+                surface.blit(icon, (x + i * LIVES_ICON_SPACING, y))
+        else:
+            self._draw_text(surface, f"Lives: {lives}", LIVES_POSITION, small=True)
 
     def _draw_resource_status(
         self,
@@ -288,15 +295,22 @@ class HUD:
             pygame.draw.polygon(surface, HUD_COOLDOWN_COLOR, points)
 
     def _draw_drone_icons(self, surface: pygame.Surface, player: object) -> None:
-        """Draw bottom-right drone icons, grayed when destroyed."""
+        """Draw the single bottom-right drone icon using sprite; grayed when destroyed."""
         drones = list(getattr(player, "drones", []))[:MAX_ACTIVE_DRONES]
-        for index in range(MAX_ACTIVE_DRONES):
-            center = (DRONE_START_X + index * DRONE_SPACING, DRONE_Y)
-            if index >= len(drones):
-                pygame.draw.circle(surface, HUD_BAR_BACK_COLOR, center, DRONE_RADIUS)
-                continue
-            drone = drones[index]
-            color = HUD_DRONE_GRAY if getattr(drone, "is_destroyed", False) else _drone_color(drone)
+        center = (DRONE_START_X, DRONE_Y)
+        if not drones:
+            # Draw an empty slot indicator
+            pygame.draw.circle(surface, HUD_BAR_BACK_COLOR, center, DRONE_RADIUS)
+            return
+        drone = drones[0]
+        is_dead = getattr(drone, "is_destroyed", False)
+        sprite = getattr(drone, "_get_sprite", lambda: None)()
+        if sprite is not None and not is_dead:
+            icon_size = DRONE_RADIUS * 2
+            icon_rect = (center[0] - DRONE_RADIUS, center[1] - DRONE_RADIUS)
+            surface.blit(sprite, icon_rect)
+        else:
+            color = HUD_DRONE_GRAY if is_dead else _drone_color(drone)
             pygame.draw.circle(surface, color, center, DRONE_RADIUS)
 
     def _draw_boss_bar(self, surface: pygame.Surface, boss: object | None) -> None:

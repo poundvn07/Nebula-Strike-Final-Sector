@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from src.entities.feather_core import FeatherCore
     from src.entities.player_ship import PlayerShip
 
-DRONE_WIDTH = 12
-DRONE_HEIGHT = 12
+DRONE_WIDTH = 32
+DRONE_HEIGHT = 32
 DRONE_HP = 1
 DRONE_ORBIT_SPEED = 2.6
 DRONE_DEFAULT_ORBIT_ANGLE = 0.0
@@ -59,6 +59,7 @@ class Drone(GameObject):
         self.is_destroyed = False
         self.fc_cost_to_summon = fc_cost_to_summon
         self.mode = DroneMode.AUTO
+        self._sprite: pygame.Surface | None = None
         self.orbit_around_player(0.0)
 
     @abstractmethod
@@ -77,9 +78,13 @@ class Drone(GameObject):
             self.orbit_around_player(dt)
 
     def render(self, surface: pygame.Surface) -> None:
-        """Draw a simple drone circle until companion sprites are available."""
-        color = DRONE_DESTROYED_COLOR if self.is_destroyed else DRONE_COLOR
-        pygame.draw.circle(surface, color, self._center_position(), self.width // 2)
+        """Draw the drone using drone.png sprite, falling back to a colored circle."""
+        sprite = self._get_sprite()
+        if sprite is not None and not self.is_destroyed:
+            surface.blit(sprite, (int(self.x), int(self.y)))
+        else:
+            color = DRONE_DESTROYED_COLOR if self.is_destroyed else DRONE_COLOR
+            pygame.draw.circle(surface, color, self._center_position(), self.width // 2)
 
     def on_death(self) -> None:
         """Destroy and deactivate the drone."""
@@ -106,8 +111,18 @@ class Drone(GameObject):
         """Set the current drone targeting posture."""
         self.mode = mode
 
+    def _get_sprite(self) -> pygame.Surface | None:
+        """Lazily load and cache the scaled drone sprite."""
+        if self._sprite is not None:
+            return self._sprite
+
+        from src.utils.assets import load_sprite
+        loaded = load_sprite("drone", (DRONE_WIDTH, DRONE_HEIGHT))
+        self._sprite = loaded
+        return self._sprite
+
     def _center_position(self) -> tuple[int, int]:
-        """Return the integer center point used by simple drone rendering."""
+        """Return the integer center point used by fallback drone rendering."""
         return (
             int(self.x + self.width / DRONE_CENTER_DIVISOR),
             int(self.y + self.height / DRONE_CENTER_DIVISOR),

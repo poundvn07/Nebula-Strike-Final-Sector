@@ -9,11 +9,9 @@ if TYPE_CHECKING:
     from src.entities.player_ship import PlayerShip
 
 from src.utils.constants import FINAL_MAP_INDEX, FIRST_MAP_INDEX, MIN_HEALTH
-from src.weapons.ice_bolt import IceBolt
 from src.weapons.laser_cannon import LaserCannon
 from src.weapons.missile_salvo import MissileSalvo
 from src.weapons.plasma_spread import PlasmaSpread
-from src.weapons.thunder_rail import ThunderRail
 from src.weapons.weapon import Weapon
 
 FEVER_STREAK_TRIGGER_COUNT = 10
@@ -27,27 +25,21 @@ DRONE_SUMMON_COST = 30
 DRONE_UNLOCK_COST = 120
 LIFE_PURCHASE_COST = 160
 MAX_PURCHASED_LIVES = 5
-WEAPON_SHOP_ORDER = ("LASER_CANNON", "PLASMA_SPREAD", "ICE_BOLT", "MISSILE_SALVO", "THUNDER_RAIL")
+WEAPON_SHOP_ORDER = ("LASER_CANNON", "PLASMA_SPREAD", "MISSILE_SALVO")
 WEAPON_SHOP_TYPES: dict[str, type[Weapon]] = {
     "LASER_CANNON": LaserCannon,
     "PLASMA_SPREAD": PlasmaSpread,
-    "ICE_BOLT": IceBolt,
     "MISSILE_SALVO": MissileSalvo,
-    "THUNDER_RAIL": ThunderRail,
 }
 WEAPON_PURCHASE_COSTS = {
     "LASER_CANNON": 60,
     "PLASMA_SPREAD": 95,
-    "ICE_BOLT": 100,
     "MISSILE_SALVO": 130,
-    "THUNDER_RAIL": 155,
 }
 WEAPON_UNLOCK_MAPS = {
     "LASER_CANNON": FIRST_MAP_INDEX,
     "PLASMA_SPREAD": FIRST_MAP_INDEX,
-    "ICE_BOLT": 2,
     "MISSILE_SALVO": 3,
-    "THUNDER_RAIL": 3,
 }
 ZERO_TIME = 0.0
 

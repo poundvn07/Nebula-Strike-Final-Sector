@@ -11,13 +11,12 @@ from src.core.game_scene import GameScene
 from src.core.scene_manager import Scene, SceneManager
 from src.systems.resource_manager import (
     DRONE_SUMMON_COST,
-    DRONE_UNLOCK_COST,
     LIFE_PURCHASE_COST,
     REPAIR_FC_CHUNK,
     ResourceManager,
     WEAPON_SHOP_TYPES,
 )
-from src.systems.save_manager import DRONE_TYPES, SaveManager
+from src.systems.save_manager import SaveManager
 from src.utils.constants import SCREEN_HEIGHT, SCREEN_WIDTH
 
 if TYPE_CHECKING:
@@ -174,7 +173,7 @@ class PreparationScene(Scene):
         """Draw map-specific weapon guidance for upcoming enemy mechanics."""
         current_map = int(self.game_state.get("current_map", 1))
         if current_map == 2:
-            tip = "Map 2: Ice bypasses Armored Rooster armor"
+            tip = "Map 2: Missile AOE bypasses Armored Rooster armor"
         elif current_map >= 3:
             tip = "Map 3+: Missile AOE can damage Dodge Hen"
         else:
@@ -230,35 +229,36 @@ class PreparationScene(Scene):
                 )
 
     def _draw_drone_section(self, surface: pygame.Surface) -> None:
-        """Draw active drone status, resummon buttons, and unlock buttons."""
+        """Draw Support Drone status, summon button, and re-summon button if destroyed."""
+        from src.entities.support_drone import SupportDrone
         font = self._get_font()
         small_font = self._get_small_font()
-        _blit_centered(surface, font.render("Drones", True, PREP_TEXT_COLOR), SECTION_RIGHT_X + SECTION_WIDTH // 2, SECTION_HEADING_Y)
+        _blit_centered(surface, font.render("Support Drone", True, PREP_TEXT_COLOR), SECTION_RIGHT_X + SECTION_WIDTH // 2, SECTION_HEADING_Y)
         y = SECTION_BODY_Y
-        if not self.player.drones:
-            surface.blit(small_font.render("No active drones", True, PREP_MUTED_TEXT_COLOR), (SECTION_RIGHT_X, y))
-            y += LINE_HEIGHT
-        for drone in self.player.drones:
-            status = "Destroyed" if drone.is_destroyed else "Active"
-            label = f"{type(drone).__name__}: {status}"
-            surface.blit(small_font.render(label, True, PREP_TEXT_COLOR), (SECTION_RIGHT_X, y))
-            if drone.is_destroyed:
-                rect = pygame.Rect(SECTION_RIGHT_X, y + 22, BUTTON_WIDTH, BUTTON_HEIGHT)
-                self._add_button(surface, rect, f"Re-summon ({DRONE_SUMMON_COST} FC)", DRONE_SUMMON_COST, lambda t=type(drone): self._summon_drone(t))
-                y += BUTTON_HEIGHT
-            y += LINE_HEIGHT
 
-        unlock_heading_y = max(y + 16, SECTION_BODY_Y + LINE_HEIGHT)
-        surface.blit(font.render("Unlocks", True, PREP_TEXT_COLOR), (SECTION_RIGHT_X, unlock_heading_y))
-        unlock_y = unlock_heading_y + 36
-        for drone_type in DRONE_TYPES.values():
-            if drone_type in self.player.unlocked_drones or int(getattr(drone_type, "unlock_cost", 0)) <= 0:
-                continue
-            unlock_cost = int(getattr(drone_type, "unlock_cost", DRONE_UNLOCK_COST))
-            label = f"{drone_type.__name__} ({unlock_cost} FC)"
-            rect = pygame.Rect(SECTION_RIGHT_X, unlock_y, BUTTON_WIDTH, BUTTON_HEIGHT)
-            self._add_button(surface, rect, label, unlock_cost, lambda t=drone_type: self._unlock_drone(t))
-            unlock_y += LINE_HEIGHT
+        active_support = next((d for d in self.player.drones if isinstance(d, SupportDrone)), None)
+
+        if active_support is None:
+            surface.blit(small_font.render("No drone deployed", True, PREP_MUTED_TEXT_COLOR), (SECTION_RIGHT_X, y))
+            y += LINE_HEIGHT
+            # Summon button — only if player has unlocked SupportDrone
+            if SupportDrone in self.player.unlocked_drones:
+                rect = pygame.Rect(SECTION_RIGHT_X, y, BUTTON_WIDTH, BUTTON_HEIGHT)
+                self._add_button(surface, rect, f"Summon ({DRONE_SUMMON_COST} FC)", DRONE_SUMMON_COST, lambda: self._summon_drone(SupportDrone))
+            else:
+                from src.entities.support_drone import SUPPORT_DRONE_UNLOCK_COST
+                rect = pygame.Rect(SECTION_RIGHT_X, y, BUTTON_WIDTH, BUTTON_HEIGHT)
+                self._add_button(surface, rect, f"Unlock ({SUPPORT_DRONE_UNLOCK_COST} FC)", SUPPORT_DRONE_UNLOCK_COST, lambda: self._unlock_drone(SupportDrone))
+        elif active_support.is_destroyed:
+            surface.blit(small_font.render("Support Drone: Destroyed", True, PREP_ERROR_COLOR), (SECTION_RIGHT_X, y))
+            y += LINE_HEIGHT
+            rect = pygame.Rect(SECTION_RIGHT_X, y, BUTTON_WIDTH, BUTTON_HEIGHT)
+            self._add_button(surface, rect, f"Re-summon ({DRONE_SUMMON_COST} FC)", DRONE_SUMMON_COST, lambda: self._summon_drone(SupportDrone))
+        else:
+            surface.blit(small_font.render("Support Drone: Active ✓", True, PREP_TEXT_COLOR), (SECTION_RIGHT_X, y))
+            y += LINE_HEIGHT
+            surface.blit(small_font.render("Collects distant FC drops", True, PREP_MUTED_TEXT_COLOR), (SECTION_RIGHT_X, y))
+
 
     def _draw_repair_section(self, surface: pygame.Surface) -> None:
         """Draw repair and life purchase controls."""

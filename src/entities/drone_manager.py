@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from src.entities.bullet import Bullet
 from src.entities.drone import Drone, DroneMode
-from src.entities.shield_drone import ShieldDrone
 from src.utils.constants import MAX_ACTIVE_DRONES
 
 if TYPE_CHECKING:
@@ -42,9 +41,6 @@ class DroneManager:
         emitted_bullets: list[Bullet] = []
         for drone in self._active_drones():
             drone.set_mode(self.mode)
-            if isinstance(drone, ShieldDrone):
-                drone.track_enemy_bullets(enemy_bullets or [])
-
             emitted = drone.update_behavior(dt, self.owner, enemies, fc_items)
             emitted_bullets.extend(item for item in emitted if isinstance(item, Bullet))
 

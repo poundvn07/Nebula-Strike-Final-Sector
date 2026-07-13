@@ -9,7 +9,7 @@ from typing import TypeAlias
 
 import pygame
 
-from src.entities.bullet import Bullet  # TODO: implement in Phase X — use stub for now
+from src.entities.bullet import Bullet
 from src.entities.feather_core import FeatherCore
 from src.entities.game_object import GameObject
 from src.utils.assets import load_enemy_sprite, play_sound
@@ -119,7 +119,7 @@ class Enemy(GameObject):
         Stores active debuffs in self._active_debuffs dict.
         OOP note: base class provides default debuff storage;
         subclasses can override to add special reactions
-        (e.g. ArmoredRooster ignores SLOWED, IceBolt bypasses armor).
+        (e.g. ArmoredRooster ignores SLOWED, Missile AOE bypasses armor).
         """
         if not hasattr(self, "_active_debuffs"):
             self._active_debuffs = {}

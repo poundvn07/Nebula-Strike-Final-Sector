@@ -13,6 +13,7 @@ AUDIO_ROOT = ASSET_ROOT / "audio"
 SPRITE_FILES = {
     "background": SPRITE_ROOT / "background.png",
     "player_ship": SPRITE_ROOT / "spaceship.png",
+    "drone": SPRITE_ROOT / "drone.png",
     "enemy_grunt": SPRITE_ROOT / "alien1.png",
     "enemy_bomber": SPRITE_ROOT / "alien2.png",
     "enemy_dodge": SPRITE_ROOT / "alien3.png",
@@ -21,7 +22,9 @@ SPRITE_FILES = {
     "boss_space_rooster": SPRITE_ROOT / "alien4.png",
     "boss_chicken_overlord": SPRITE_ROOT / "alien5.png",
     "player_bullet": SPRITE_ROOT / "bullet.png",
+    "combo_bullet": SPRITE_ROOT / "laser.png",
     "enemy_bullet": SPRITE_ROOT / "alien_bullet.png",
+    "lives_icon": SPRITE_ROOT / "lives.png",
     "explosion_1": SPRITE_ROOT / "explosion1.png",
     "explosion_2": SPRITE_ROOT / "explosion2.png",
     "explosion_3": SPRITE_ROOT / "explosion3.png",
