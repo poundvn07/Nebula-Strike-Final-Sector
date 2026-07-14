@@ -8,6 +8,7 @@ venv/
 env/
 
 .pytest_cache/
+.python-version
 .coverage
 
 .DS_Store
@@ -17,4 +18,5 @@ env/
 data/save_state.json
 AI_GUIDE.md
 Bao_Cao_Do_An_OOP.md
+Bao_Cao_Do_An_OOP.docx
 De_xuat_do_an_OOP.md
