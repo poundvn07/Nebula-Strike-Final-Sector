@@ -8,25 +8,30 @@ from src.core.scene_manager import Scene, SceneManager
 from src.entities.player_ship import PlayerShip
 from src.systems.save_manager import SaveManager
 from src.ui.preparation_screen import PreparationScene
-from src.utils.resource import play_sound
+from src.ui.theme import (
+    COLOR_ACCENT_HOVER,
+    COLOR_MUTED,
+    COLOR_TEXT,
+    draw_button,
+    draw_panel,
+    draw_space_background,
+    mouse_over,
+)
+from src.utils.resource import load_font, play_sound
 from src.utils.constants import SCREEN_WIDTH
 
-MENU_BG_COLOR = (6, 10, 20)
-MENU_TEXT_COLOR = (230, 240, 255)
-MENU_STATS_TEXT_COLOR = (158, 176, 205)
-MENU_BUTTON_COLOR = (34, 70, 110)
-MENU_BUTTON_TEXT_COLOR = (255, 255, 255)
 MENU_FONT_SIZE = 34
 MENU_STATS_FONT_SIZE = 22
 MENU_TITLE_FONT_SIZE = 56
-MENU_BUTTON_WIDTH = 220
-MENU_BUTTON_HEIGHT = 44
 MENU_CENTER_X = SCREEN_WIDTH // 2
-MENU_TITLE_Y = 84
-NEW_GAME_BUTTON_RECT = pygame.Rect(MENU_CENTER_X - MENU_BUTTON_WIDTH // 2, 224, MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)
-CONTINUE_BUTTON_RECT = pygame.Rect(MENU_CENTER_X - MENU_BUTTON_WIDTH // 2, 284, MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)
-MENU_SUMMARY_Y = 352
-MENU_SUMMARY_LINE_HEIGHT = 26
+MENU_EYEBROW_Y = 58
+MENU_TITLE_Y = 112
+MENU_SUBTITLE_Y = 166
+MENU_PANEL_RECT = pygame.Rect(MENU_CENTER_X - 194, 218, 388, 374)
+NEW_GAME_BUTTON_RECT = pygame.Rect(MENU_CENTER_X - 150, 292, 300, 58)
+CONTINUE_BUTTON_RECT = pygame.Rect(MENU_CENTER_X - 150, 370, 300, 58)
+MENU_SUMMARY_RECT = pygame.Rect(MENU_CENTER_X - 150, 458, 300, 96)
+MENU_FOOTER_Y = 716
 
 
 class MainMenuScene(Scene):
@@ -39,15 +44,15 @@ class MainMenuScene(Scene):
         self._font: pygame.font.Font | None = None
         self._stats_font: pygame.font.Font | None = None
         self._title_font: pygame.font.Font | None = None
-        self._buttons: list[tuple[pygame.Rect, str, object]] = []
+        self._buttons: list[tuple[pygame.Rect, str, object, bool]] = []
 
     def handle_event(self, event: pygame.event.Event) -> None:
         """Handle menu button clicks."""
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
 
-        for rect, _label, action in self._buttons:
-            if rect.collidepoint(event.pos):
+        for rect, _label, action, enabled in self._buttons:
+            if enabled and rect.collidepoint(event.pos):
                 play_sound("menu_select")
                 action()
                 return
@@ -58,34 +63,58 @@ class MainMenuScene(Scene):
 
     def render(self, surface: pygame.Surface) -> None:
         """Render title, save summary, and menu buttons."""
-        surface.fill(MENU_BG_COLOR)
-        title = self._get_title_font().render("Nebula Strike", True, MENU_TEXT_COLOR)
+        draw_space_background(surface)
+        eyebrow = self._get_stats_font().render("NEBULA COMMAND", True, COLOR_ACCENT_HOVER)
+        _blit_centered(surface, eyebrow, MENU_CENTER_X, MENU_EYEBROW_Y)
+        title = self._get_title_font().render("Nebula Strike", True, COLOR_TEXT)
         _blit_centered(surface, title, MENU_CENTER_X, MENU_TITLE_Y)
-        self._buttons = [
-            (NEW_GAME_BUTTON_RECT, "New Game", self._new_game),
-            (CONTINUE_BUTTON_RECT, "Continue", self._continue_game),
-        ]
-        for rect, label, _action in self._buttons:
-            _draw_button(surface, rect, label, self._get_font())
-        self._render_summary(surface)
+        subtitle = self._get_stats_font().render("FINAL SECTOR", True, COLOR_MUTED)
+        _blit_centered(surface, subtitle, MENU_CENTER_X, MENU_SUBTITLE_Y)
 
-    def _render_summary(self, surface: pygame.Surface) -> None:
-        """Render compact save summary for Continue."""
+        draw_panel(surface, MENU_PANEL_RECT, raised=True)
+        prompt = self._get_stats_font().render("SELECT MISSION", True, COLOR_MUTED)
+        _blit_centered(surface, prompt, MENU_CENTER_X, MENU_PANEL_RECT.y + 38)
         summary = self.save_manager.get_save_summary()
+        has_save = bool(summary)
+        self._buttons = [
+            (NEW_GAME_BUTTON_RECT, "New Game", self._new_game, True),
+            (CONTINUE_BUTTON_RECT, "Continue", self._continue_game, has_save),
+        ]
+        for index, (rect, label, _action, enabled) in enumerate(self._buttons):
+            draw_button(
+                surface,
+                rect,
+                label,
+                self._get_font(),
+                enabled=enabled,
+                primary=index == 0,
+                hovered=enabled and mouse_over(rect),
+            )
+        self._render_summary(surface, summary)
+        footer = self._get_stats_font().render("ARROW KEYS / WASD TO FLY    |    SPACE TO FIRE", True, COLOR_MUTED)
+        _blit_centered(surface, footer, MENU_CENTER_X, MENU_FOOTER_Y)
+
+    def _render_summary(self, surface: pygame.Surface, summary: dict[str, object] | None) -> None:
+        """Render compact save summary for Continue."""
+        draw_panel(surface, MENU_SUMMARY_RECT, raised=False, shadow=False)
         if not summary:
-            lines = ["No save found"]
+            heading = "NO ACTIVE RUN"
+            lines = ["Start a new game to begin your mission"]
         else:
+            heading = "CURRENT RUN"
             lines = [
                 f"Map {summary['current_map']}  |  HP {int(summary['ship_hp_percent'])}%",
                 f"Score {summary['score']}  |  FC {summary['fc_inventory']}",
             ]
+        heading_surface = self._get_stats_font().render(heading, True, COLOR_ACCENT_HOVER)
+        _blit_centered(surface, heading_surface, MENU_CENTER_X, MENU_SUMMARY_RECT.y + 24)
         for line_index, text in enumerate(lines):
-            rendered = self._get_stats_font().render(text, True, MENU_STATS_TEXT_COLOR)
+            rendered = self._get_stats_font().render(text, True, COLOR_MUTED)
             _blit_centered(
                 surface,
                 rendered,
                 MENU_CENTER_X,
-                MENU_SUMMARY_Y + line_index * MENU_SUMMARY_LINE_HEIGHT,
+                MENU_SUMMARY_RECT.y + 55 + line_index * 24,
             )
 
     def _continue_game(self) -> None:
@@ -109,28 +138,20 @@ class MainMenuScene(Scene):
     def _get_font(self) -> pygame.font.Font:
         """Create the menu font lazily."""
         if self._font is None:
-            self._font = pygame.font.Font(None, MENU_FONT_SIZE)
+            self._font = load_font(MENU_FONT_SIZE)
         return self._font
 
     def _get_stats_font(self) -> pygame.font.Font:
         """Create the compact save-summary font lazily."""
         if self._stats_font is None:
-            self._stats_font = pygame.font.Font(None, MENU_STATS_FONT_SIZE)
+            self._stats_font = load_font(MENU_STATS_FONT_SIZE)
         return self._stats_font
 
     def _get_title_font(self) -> pygame.font.Font:
         """Create the title font lazily."""
         if self._title_font is None:
-            self._title_font = pygame.font.Font(None, MENU_TITLE_FONT_SIZE)
+            self._title_font = load_font(MENU_TITLE_FONT_SIZE)
         return self._title_font
-
-
-def _draw_button(surface: pygame.Surface, rect: pygame.Rect, label: str, font: pygame.font.Font) -> None:
-    """Draw a menu button."""
-    pygame.draw.rect(surface, MENU_BUTTON_COLOR, rect)
-    text = font.render(label, True, MENU_BUTTON_TEXT_COLOR)
-    _blit_centered(surface, text, rect.centerx, rect.centery)
-
 
 def _blit_centered(surface: pygame.Surface, rendered: pygame.Surface, center_x: int, center_y: int) -> None:
     """Blit rendered text centered around the given coordinate."""

@@ -13,8 +13,18 @@ from src.entities.player_ship import PlayerShip
 from src.systems.save_manager import SaveManager
 from src.systems.wave_manager import WaveManager
 from src.ui.hud import HUD
+from src.ui.theme import (
+    COLOR_ACCENT_HOVER,
+    COLOR_MUTED,
+    COLOR_PANEL_RAISED,
+    COLOR_TEXT,
+    draw_button,
+    draw_panel,
+    mouse_over,
+)
 from src.utils.resource import (
     background_music_muted,
+    load_font,
     load_sprite,
     play_sound,
     sound_effects_muted,
@@ -42,28 +52,32 @@ INTRO_FONT_SIZE = 72
 INTRO_TEXT_COLOR = (235, 244, 255)
 INTRO_SHADOW_COLOR = (18, 24, 36)
 PAUSE_OVERLAY_COLOR = (4, 8, 18)
-PAUSE_PANEL_COLOR = (12, 18, 32)
 PAUSE_TEXT_COLOR = (235, 244, 255)
-PAUSE_MUTED_TEXT_COLOR = (160, 174, 200)
 PAUSE_TITLE_FONT_SIZE = 48
 PAUSE_FONT_SIZE = 24
 PAUSE_SMALL_FONT_SIZE = 20
-PAUSE_PANEL_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 285, 96, 570, 570)
+PAUSE_MENU_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 210, 128, 420, 500)
+PAUSE_RESUME_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 150, 300, 300, 52)
+PAUSE_CONTROLS_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 150, 370, 300, 52)
+PAUSE_SOUND_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 150, 450, 142, 48)
+PAUSE_MUSIC_RECT = pygame.Rect(SCREEN_WIDTH // 2 + 8, 450, 142, 48)
+CONTROLS_PANEL_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 350, 54, 700, 660)
+CONTROLS_BACK_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 130, 642, 260, 46)
 RESPAWN_INVULNERABLE_SECONDS = 0.8
 RESET_MAP_UNLOCKED = [True, False, False, False, False]
-CONTROLS_TEXT_LINES = (
-    "Move: WASD or Arrow Keys",
-    "Fire active weapon: Space",
-    "Cycle active weapon: Tab",
-    "Select active weapon: 1 / 2 / 3",
-    "Combo attack: hold 1+2, 1+3, or 2+3",
-    "Combo requires two different max-level weapons",
-    "Toggle drone mode: Q",
-    "Pause / Resume: P or Esc",
-    "Controls guide: H",
-    "Mute sound effects: M",
-    "Mute background music: N",
-    "Preparation / Retry / Menu buttons: Mouse click",
+CONTROL_BINDINGS = (
+    ("WASD / ARROWS", "Move ship"),
+    ("SPACE", "Fire active weapon"),
+    ("TAB", "Cycle weapon"),
+    ("1 / 2 / 3", "Select weapon slot"),
+    ("HOLD 2 SLOTS", "Combo attack"),
+    ("Q", "Toggle drone mode"),
+    ("P / ESC", "Pause or resume"),
+    ("H", "Open controls"),
+    ("M", "Mute sound effects"),
+    ("N", "Mute music"),
+    ("MOUSE", "Menus and upgrades"),
+    ("MAX LV PAIR", "Unlock weapon combo"),
 )
 
 
@@ -107,6 +121,9 @@ class GameScene(Scene):
 
     def handle_event(self, event: pygame.event.Event) -> None:
         """Handle gameplay input events."""
+        if event.type == pygame.MOUSEBUTTONDOWN and self._is_pause_overlay_active():
+            self._handle_pause_click(event.pos)
+            return
         if event.type == pygame.KEYDOWN:
             if event.key in PAUSE_KEYS:
                 self._toggle_pause()
@@ -411,7 +428,8 @@ class GameScene(Scene):
         """Start a wave immediately, with combat gated by countdown intro text."""
         self.bullets.clear()
         self.wave_manager.start_wave(wave_num)
-        self.wave_manager.spawn_pending_now()
+        if self.wave_manager.should_spawn_all_on_intro():
+            self.wave_manager.spawn_pending_now()
         self._begin_wave_intro()
 
     def _begin_wave_intro(self) -> None:
@@ -448,12 +466,31 @@ class GameScene(Scene):
         """Toggle paused gameplay state."""
         if self.controls_visible:
             self.controls_visible = False
+            self.paused = True
+            return
         self.paused = not self.paused
 
     def _toggle_controls_guide(self) -> None:
-        """Toggle the full controls guide and pause gameplay while it is visible."""
+        """Toggle the dedicated controls panel while keeping gameplay paused."""
         self.controls_visible = not self.controls_visible
-        self.paused = self.controls_visible
+        self.paused = True
+
+    def _handle_pause_click(self, position: tuple[int, int]) -> None:
+        """Handle pause-menu and controls-panel mouse actions."""
+        if self.controls_visible:
+            if CONTROLS_BACK_RECT.collidepoint(position):
+                self.controls_visible = False
+                self.paused = True
+            return
+        if PAUSE_RESUME_RECT.collidepoint(position):
+            self.paused = False
+        elif PAUSE_CONTROLS_RECT.collidepoint(position):
+            self.controls_visible = True
+            self.paused = True
+        elif PAUSE_SOUND_RECT.collidepoint(position):
+            toggle_sound_effects_muted()
+        elif PAUSE_MUSIC_RECT.collidepoint(position):
+            toggle_background_music_muted()
 
     def _is_pause_overlay_active(self) -> bool:
         """Return whether pause or controls overlay is currently blocking gameplay."""
@@ -559,61 +596,126 @@ class GameScene(Scene):
         surface.blit(text_surface, text_surface.get_rect(center=center))
 
     def _render_pause_overlay(self, surface: pygame.Surface) -> None:
-        """Draw the pause/options/controls overlay when gameplay is paused."""
+        """Draw either the compact pause menu or the requested controls panel."""
         if not self._is_pause_overlay_active():
             return
 
-        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        if hasattr(overlay, "set_alpha"):
-            overlay.set_alpha(218)
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill(PAUSE_OVERLAY_COLOR)
+        overlay.set_alpha(226)
         surface.blit(overlay, (0, 0))
 
-        pygame.draw.rect(surface, PAUSE_PANEL_COLOR, PAUSE_PANEL_RECT)
-        title = "Controls" if self.controls_visible else "Paused"
-        title_surface = self._get_pause_title_font().render(title, True, PAUSE_TEXT_COLOR)
-        surface.blit(title_surface, title_surface.get_rect(center=(SCREEN_WIDTH // 2, PAUSE_PANEL_RECT.y + 48)))
+        if self.controls_visible:
+            self._draw_controls_panel(surface)
+        else:
+            self._draw_pause_menu(surface)
+
+    def _draw_pause_menu(self, surface: pygame.Surface) -> None:
+        """Draw pause actions without exposing the full keybind guide."""
+        draw_panel(surface, PAUSE_MENU_RECT, raised=True)
+        eyebrow = self._get_pause_small_font().render("GAME PAUSED", True, COLOR_ACCENT_HOVER)
+        surface.blit(eyebrow, eyebrow.get_rect(center=(SCREEN_WIDTH // 2, PAUSE_MENU_RECT.y + 38)))
+        title = self._get_pause_title_font().render("Take a Breather", True, COLOR_TEXT)
+        surface.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, PAUSE_MENU_RECT.y + 88)))
+        subtitle = self._get_pause_small_font().render("Combat and timers are frozen", True, COLOR_MUTED)
+        surface.blit(subtitle, subtitle.get_rect(center=(SCREEN_WIDTH // 2, PAUSE_MENU_RECT.y + 128)))
+
+        draw_button(
+            surface,
+            PAUSE_RESUME_RECT,
+            "Resume Game",
+            self._get_pause_font(),
+            primary=True,
+            hovered=mouse_over(PAUSE_RESUME_RECT),
+        )
+        draw_button(
+            surface,
+            PAUSE_CONTROLS_RECT,
+            "View Controls",
+            self._get_pause_font(),
+            hovered=mouse_over(PAUSE_CONTROLS_RECT),
+        )
 
         sound_label = "Muted" if sound_effects_muted() else "On"
         music_label = "Muted" if background_music_muted() else "On"
-        status_lines = (
-            f"Sound effects: {sound_label}    Background music: {music_label}",
-            "Press P/Esc to resume. Press H to show or hide this guide.",
+        draw_button(
+            surface,
+            PAUSE_SOUND_RECT,
+            f"SFX: {sound_label}",
+            self._get_pause_small_font(),
+            hovered=mouse_over(PAUSE_SOUND_RECT),
         )
-        y = PAUSE_PANEL_RECT.y + 94
-        for line in status_lines:
-            text_surface = self._get_pause_small_font().render(line, True, PAUSE_MUTED_TEXT_COLOR)
-            surface.blit(text_surface, text_surface.get_rect(center=(SCREEN_WIDTH // 2, y)))
-            y += 28
+        draw_button(
+            surface,
+            PAUSE_MUSIC_RECT,
+            f"Music: {music_label}",
+            self._get_pause_small_font(),
+            hovered=mouse_over(PAUSE_MUSIC_RECT),
+        )
+        hint = self._get_pause_small_font().render("P / Esc resumes    |    H opens controls", True, COLOR_MUTED)
+        surface.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, PAUSE_MENU_RECT.bottom - 56)))
 
-        y += 16
-        for line in CONTROLS_TEXT_LINES:
-            text_surface = self._get_pause_font().render(line, True, PAUSE_TEXT_COLOR)
-            surface.blit(text_surface, (PAUSE_PANEL_RECT.x + 48, y))
-            y += 34
+    def _draw_controls_panel(self, surface: pygame.Surface) -> None:
+        """Draw keybinds only after the player explicitly requests them."""
+        draw_panel(surface, CONTROLS_PANEL_RECT, raised=True)
+        eyebrow = self._get_pause_small_font().render("REFERENCE", True, COLOR_ACCENT_HOVER)
+        surface.blit(eyebrow, eyebrow.get_rect(center=(SCREEN_WIDTH // 2, CONTROLS_PANEL_RECT.y + 34)))
+        title = self._get_pause_title_font().render("Controls", True, COLOR_TEXT)
+        surface.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, CONTROLS_PANEL_RECT.y + 78)))
+        subtitle = self._get_pause_small_font().render("Everything you need during a mission", True, COLOR_MUTED)
+        surface.blit(subtitle, subtitle.get_rect(center=(SCREEN_WIDTH // 2, CONTROLS_PANEL_RECT.y + 118)))
+
+        column_width = 306
+        row_height = 58
+        row_gap = 10
+        start_x = CONTROLS_PANEL_RECT.x + 30
+        start_y = CONTROLS_PANEL_RECT.y + 150
+        for index, (key, action) in enumerate(CONTROL_BINDINGS):
+            column = index // 6
+            row = index % 6
+            rect = pygame.Rect(
+                start_x + column * (column_width + 28),
+                start_y + row * (row_height + row_gap),
+                column_width,
+                row_height,
+            )
+            pygame.draw.rect(surface, COLOR_PANEL_RAISED, rect, border_radius=8)
+            key_surface = self._get_pause_small_font().render(key, True, COLOR_ACCENT_HOVER)
+            action_surface = self._get_pause_small_font().render(action, True, PAUSE_TEXT_COLOR)
+            surface.blit(key_surface, (rect.x + 14, rect.y + 8))
+            surface.blit(action_surface, (rect.x + 14, rect.y + 31))
+
+        draw_button(
+            surface,
+            CONTROLS_BACK_RECT,
+            "Back to Pause",
+            self._get_pause_small_font(),
+            primary=True,
+            hovered=mouse_over(CONTROLS_BACK_RECT),
+        )
 
     def _get_intro_font(self) -> pygame.font.Font:
         """Create the countdown font lazily."""
         if self._intro_font is None:
-            self._intro_font = pygame.font.Font(None, INTRO_FONT_SIZE)
+            self._intro_font = load_font(INTRO_FONT_SIZE)
         return self._intro_font
 
     def _get_pause_title_font(self) -> pygame.font.Font:
         """Create the pause title font lazily."""
         if self._pause_title_font is None:
-            self._pause_title_font = pygame.font.Font(None, PAUSE_TITLE_FONT_SIZE)
+            self._pause_title_font = load_font(PAUSE_TITLE_FONT_SIZE)
         return self._pause_title_font
 
     def _get_pause_font(self) -> pygame.font.Font:
         """Create the pause guide font lazily."""
         if self._pause_font is None:
-            self._pause_font = pygame.font.Font(None, PAUSE_FONT_SIZE)
+            self._pause_font = load_font(PAUSE_FONT_SIZE)
         return self._pause_font
 
     def _get_pause_small_font(self) -> pygame.font.Font:
         """Create the pause status font lazily."""
         if self._pause_small_font is None:
-            self._pause_small_font = pygame.font.Font(None, PAUSE_SMALL_FONT_SIZE)
+            self._pause_small_font = load_font(PAUSE_SMALL_FONT_SIZE)
         return self._pause_small_font
 
     def _get_active_boss(self) -> object | None:

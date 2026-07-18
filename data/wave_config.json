@@ -1,0 +1,198 @@
+{
+  "formations": {
+    "opening_grid": {
+      "columns": 6,
+      "origin": [512, 92],
+      "spacing": [96, 68],
+      "movement": "v",
+      "spawn_delay": 0.0,
+      "spawn_stagger": 0.0,
+      "spawn_all_on_intro": true,
+      "coordinated_types": ["chicken_grunt", "egg_bomber"],
+      "sway": { "x": 52.0, "y": 28.0, "x_rate": 1.25, "y_rate": 0.85 },
+      "bounds": { "top": 42.0, "bottom_ratio": 0.55, "left": 12.0, "right": 12.0 }
+    },
+    "v_grid": {
+      "columns": 6,
+      "origin": [512, 96],
+      "spacing": [96, 68],
+      "movement": "v",
+      "spawn_delay": 0.0,
+      "spawn_stagger": 0.0,
+      "spawn_all_on_intro": true,
+      "coordinated_types": ["chicken_grunt", "egg_bomber"],
+      "sway": { "x": 52.0, "y": 28.0, "x_rate": 1.25, "y_rate": 0.85 },
+      "bounds": { "top": 42.0, "bottom_ratio": 0.55, "left": 12.0, "right": 12.0 }
+    },
+    "grid": {
+      "columns": 6,
+      "origin": [512, 96],
+      "spacing": [96, 68],
+      "movement": "grid",
+      "spawn_delay": 0.0,
+      "spawn_stagger": 0.0,
+      "spawn_all_on_intro": true,
+      "coordinated_types": ["chicken_grunt", "egg_bomber"],
+      "sway": { "x": 52.0, "y": 28.0, "x_rate": 1.25, "y_rate": 0.85 },
+      "bounds": { "top": 42.0, "bottom_ratio": 0.55, "left": 12.0, "right": 12.0 }
+    },
+    "spiral_grid": {
+      "columns": 6,
+      "origin": [512, 96],
+      "spacing": [96, 68],
+      "movement": "spiral",
+      "spawn_delay": 0.0,
+      "spawn_stagger": 0.0,
+      "spawn_all_on_intro": true,
+      "coordinated_types": ["chicken_grunt", "egg_bomber"],
+      "sway": { "x": 52.0, "y": 28.0, "x_rate": 1.25, "y_rate": 0.85 },
+      "bounds": { "top": 42.0, "bottom_ratio": 0.55, "left": 12.0, "right": 12.0 }
+    },
+    "chevron_assault": {
+      "layout": "chevron",
+      "layout_options": { "depth": 0.45 },
+      "columns": 6,
+      "origin": [512, 82],
+      "spacing": [100, 72],
+      "movement": "v",
+      "spawn_delay": 0.0,
+      "spawn_stagger": 0.0,
+      "spawn_all_on_intro": true,
+      "coordinated_types": ["chicken_grunt", "egg_bomber"],
+      "sway": { "x": 64.0, "y": 18.0, "x_rate": 1.7, "y_rate": 0.65 },
+      "bounds": { "top": 42.0, "bottom_ratio": 0.62, "left": 12.0, "right": 12.0 }
+    },
+    "staggered_wings": {
+      "layout": "staggered",
+      "layout_options": { "row_offset": 0.5 },
+      "columns": 6,
+      "origin": [488, 88],
+      "spacing": [96, 70],
+      "movement": "grid",
+      "spawn_delay": 0.0,
+      "spawn_stagger": 0.0,
+      "spawn_all_on_intro": true,
+      "coordinated_types": ["chicken_grunt", "egg_bomber"],
+      "sway": { "x": 40.0, "y": 36.0, "x_rate": 0.9, "y_rate": 1.55 },
+      "bounds": { "top": 42.0, "bottom_ratio": 0.62, "left": 12.0, "right": 12.0 }
+    },
+    "wave_screen": {
+      "layout": "wave",
+      "layout_options": { "amplitude": 28.0, "cycles": 1.25 },
+      "columns": 6,
+      "origin": [512, 108],
+      "spacing": [96, 78],
+      "movement": "spiral",
+      "spawn_delay": 0.0,
+      "spawn_stagger": 0.0,
+      "spawn_all_on_intro": true,
+      "coordinated_types": ["chicken_grunt", "egg_bomber"],
+      "sway": { "x": 70.0, "y": 20.0, "x_rate": 1.35, "y_rate": 0.72 },
+      "bounds": { "top": 42.0, "bottom_ratio": 0.66, "left": 12.0, "right": 12.0 }
+    },
+    "diamond_core": {
+      "layout": "diamond",
+      "columns": 6,
+      "origin": [512, 280],
+      "spacing": [92, 68],
+      "movement": "grid",
+      "spawn_delay": 0.0,
+      "spawn_stagger": 0.0,
+      "spawn_all_on_intro": true,
+      "coordinated_types": ["chicken_grunt", "egg_bomber"],
+      "sway": { "x": 34.0, "y": 44.0, "x_rate": 0.76, "y_rate": 1.32 },
+      "bounds": { "top": 24.0, "bottom_ratio": 0.68, "left": 12.0, "right": 12.0 }
+    }
+  },
+  "maps": {
+    "map_1": {
+      "waves": [
+        {
+          "formation": "opening_grid",
+          "enemy_count": 12,
+          "enemy_pattern": ["chicken_grunt"],
+          "attack_cooldown_scale": 2.6,
+          "attack_cooldown_sequence": { "base": 0.75, "step": 0.18 }
+        },
+        { "formation": "v_grid", "enemy_count": 12, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.49 },
+        { "formation": "v_grid", "enemy_count": 12, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.53 },
+        { "formation": "grid", "enemy_count": 18, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.57 },
+        {
+          "formation": "grid",
+          "enemy_count": 18,
+          "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"],
+          "attack_cooldown_scale": 1.61,
+          "boss": { "type": "space_rooster", "phases": 1 }
+        }
+      ]
+    },
+    "map_2": {
+      "waves": [
+        { "formation": "v_grid", "enemy_count": 12, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.53 },
+        { "formation": "v_grid", "enemy_count": 12, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.57 },
+        { "formation": "chevron_assault", "enemy_count": 18, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.61 },
+        { "formation": "staggered_wings", "enemy_count": 18, "enemy_pattern": ["armored_rooster", "armored_rooster", "kamikaze", "chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.65 },
+        { "formation": "wave_screen", "enemy_count": 18, "enemy_pattern": ["armored_rooster", "armored_rooster", "kamikaze", "chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.69 },
+        {
+          "formation": "grid",
+          "enemy_count": 24,
+          "enemy_pattern": ["armored_rooster", "armored_rooster", "kamikaze", "chicken_grunt", "egg_bomber", "kamikaze"],
+          "attack_cooldown_scale": 1.73,
+          "boss": { "type": "space_rooster", "phases": 1 }
+        }
+      ]
+    },
+    "map_3": {
+      "waves": [
+        { "formation": "v_grid", "enemy_count": 12, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.61 },
+        { "formation": "chevron_assault", "enemy_count": 18, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.65 },
+        { "formation": "staggered_wings", "enemy_count": 18, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.69 },
+        { "formation": "wave_screen", "enemy_count": 18, "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.73 },
+        { "formation": "diamond_core", "enemy_count": 24, "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.77 },
+        { "formation": "chevron_assault", "enemy_count": 24, "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.81 },
+        {
+          "formation": "spiral_grid",
+          "enemy_count": 24,
+          "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "chicken_grunt", "egg_bomber", "kamikaze"],
+          "attack_cooldown_scale": 1.85,
+          "boss": { "type": "space_rooster", "phases": 3 }
+        }
+      ]
+    },
+    "map_4": {
+      "waves": [
+        { "formation": "chevron_assault", "enemy_count": 18, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.69 },
+        { "formation": "wave_screen", "enemy_count": 18, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.73 },
+        { "formation": "staggered_wings", "enemy_count": 18, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.77 },
+        { "formation": "diamond_core", "enemy_count": 24, "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "dodge_hen", "armored_rooster", "kamikaze"], "attack_cooldown_scale": 1.81 },
+        { "formation": "wave_screen", "enemy_count": 24, "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "dodge_hen", "armored_rooster", "kamikaze"], "attack_cooldown_scale": 1.85 },
+        { "formation": "chevron_assault", "enemy_count": 24, "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "dodge_hen", "armored_rooster", "kamikaze"], "attack_cooldown_scale": 1.89 },
+        {
+          "formation": "spiral_grid",
+          "enemy_count": 30,
+          "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "dodge_hen", "armored_rooster", "kamikaze"],
+          "attack_cooldown_scale": 1.93,
+          "boss": { "type": "chicken_overlord", "phases": 1 }
+        }
+      ]
+    },
+    "map_5": {
+      "waves": [
+        { "formation": "wave_screen", "enemy_count": 18, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.77 },
+        { "formation": "chevron_assault", "enemy_count": 18, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.81 },
+        { "formation": "staggered_wings", "enemy_count": 24, "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.85 },
+        { "formation": "diamond_core", "enemy_count": 24, "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.89 },
+        { "formation": "wave_screen", "enemy_count": 24, "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.93 },
+        { "formation": "chevron_assault", "enemy_count": 30, "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 1.97 },
+        { "formation": "staggered_wings", "enemy_count": 30, "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "chicken_grunt", "egg_bomber", "kamikaze"], "attack_cooldown_scale": 2.01 },
+        {
+          "formation": "spiral_grid",
+          "enemy_count": 30,
+          "enemy_pattern": ["armored_rooster", "dodge_hen", "armored_rooster", "chicken_grunt", "egg_bomber", "kamikaze"],
+          "attack_cooldown_scale": 2.05,
+          "boss": { "type": "chicken_overlord", "phases": 2 }
+        }
+      ]
+    }
+  }
+}

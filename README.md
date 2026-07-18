@@ -79,7 +79,44 @@ assets/
 data/
   weapon_stats.json
   enemy_stats.json
+  wave_config.json
 ```
+
+## Configuring Enemy Waves
+
+Enemy composition, spawn timing, formations, movement sway, and bosses are
+configured in `data/wave_config.json`. Each map contains an ordered `waves`
+array. A wave can repeat an enemy pattern:
+
+```json
+{
+  "formation": "grid",
+  "enemy_count": 12,
+  "enemy_pattern": ["chicken_grunt", "egg_bomber", "kamikaze"]
+}
+```
+
+Alternatively, use `enemies` for an exact type order and `positions` for an
+arbitrary formation. Include one `[x, y]` position for every enemy and boss:
+
+```json
+{
+  "formation": "grid",
+  "enemies": ["egg_bomber", "chicken_grunt"],
+  "positions": [[300, 90], [700, 160]]
+}
+```
+
+Named presets under `formations` control columns, origin, spacing, spawn
+stagger, coordinated enemy types, sway, and screen bounds. Restart the game
+after editing the file so the selected map reloads its wave configuration.
+Regular formation sprites keep a six-pixel minimum gap while swaying; unsafe
+custom positions and boss summons are separated before movement is applied.
+Set `layout` to `grid`, `chevron`, `staggered`, `wave`, or `diamond` in any
+formation preset. Optional `layout_options` tune shape-specific values such as
+chevron `depth`, staggered `row_offset`, or wave `amplitude` and `cycles`.
+Set `spawn_all_on_intro` to `false` when `spawn_delay` and `spawn_stagger`
+should release enemies gradually after the countdown.
 
 ## Runtime Files
 

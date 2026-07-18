@@ -13,7 +13,13 @@ from src.entities.pickup import Pickup
 from src.entities.game_object import GameObject
 from src.enemies.enemy import Enemy
 from src.utils.resource import load_sprite, play_sound
-from src.utils.constants import MAX_ACTIVE_DRONES, MIN_HEALTH, SCREEN_HEIGHT, SCREEN_WIDTH
+from src.utils.constants import (
+    COMBAT_HUD_BOTTOM_SAFE_HEIGHT,
+    MAX_ACTIVE_DRONES,
+    MIN_HEALTH,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+)
 from src.weapons.weapon import DEFAULT_FIRE_DIRECTION, MAX_WEAPON_LEVEL, ComboType, Direction, Weapon, WeaponType
 
 PLAYER_WIDTH = 54
@@ -21,7 +27,7 @@ PLAYER_HEIGHT = 59
 PLAYER_MAX_HP = 100
 PLAYER_SPEED = 260.0
 PLAYER_START_X = SCREEN_WIDTH / 2 - PLAYER_WIDTH / 2
-PLAYER_START_Y = SCREEN_HEIGHT - PLAYER_HEIGHT * 2
+PLAYER_START_Y = SCREEN_HEIGHT - COMBAT_HUD_BOTTOM_SAFE_HEIGHT - PLAYER_HEIGHT
 PLAYER_WEAPON_SLOT_COUNT = 3
 PLAYER_MUZZLE_OFFSETS = (-16.0, 0.0, 16.0)
 PLAYER_DEFAULT_ACTIVE_WEAPON_SLOT = 0
@@ -143,7 +149,7 @@ class PlayerShip(GameObject):
         self.active_combo = None
 
     def move(self, keys_pressed: Mapping[int, bool] | Sequence[bool], dt: float) -> None:
-        """Move with WASD or arrow keys and clamp the ship to screen bounds."""
+        """Move with WASD or arrow keys and stay above the bottom HUD gutter."""
         dx = ZERO_MOVEMENT
         dy = ZERO_MOVEMENT
 
@@ -162,7 +168,11 @@ class PlayerShip(GameObject):
             dy = dy / magnitude * self.speed
 
         self.x = _clamp(self.x + dx * dt, ZERO_MOVEMENT, SCREEN_WIDTH - self.width)
-        self.y = _clamp(self.y + dy * dt, ZERO_MOVEMENT, SCREEN_HEIGHT - self.height)
+        self.y = _clamp(
+            self.y + dy * dt,
+            ZERO_MOVEMENT,
+            SCREEN_HEIGHT - COMBAT_HUD_BOTTOM_SAFE_HEIGHT - self.height,
+        )
 
     def fire(self, dt: float) -> list[Bullet]:
         """Fire only the currently selected weapon slot."""

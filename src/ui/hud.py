@@ -8,15 +8,24 @@ from math import cos, radians, sin
 import pygame
 
 from src.entities.support_drone import SupportDrone
-from src.utils.resource import load_sprite
+from src.ui.theme import (
+    COLOR_ACCENT,
+    COLOR_ACCENT_HOVER,
+    COLOR_BORDER,
+    COLOR_MUTED,
+    COLOR_PANEL_RAISED,
+    COLOR_SUCCESS,
+    COLOR_TEXT,
+    COLOR_WARNING,
+)
+from src.utils.resource import load_font, load_sprite
 from src.utils.constants import MAX_ACTIVE_DRONES, SCREEN_HEIGHT, SCREEN_WIDTH
 from src.weapons.weapon import ComboType
 
-HUD_TEXT_COLOR = (235, 244, 255)
-HUD_MUTED_COLOR = (145, 155, 175)
-HUD_PANEL_COLOR = (8, 12, 24)
-HUD_ACTIVE_PANEL_COLOR = (18, 42, 72)
-HUD_ACTIVE_BORDER_COLOR = (120, 205, 255)
+HUD_TEXT_COLOR = COLOR_TEXT
+HUD_MUTED_COLOR = COLOR_MUTED
+HUD_ACTIVE_PANEL_COLOR = (22, 52, 82)
+HUD_ACTIVE_BORDER_COLOR = COLOR_ACCENT_HOVER
 HUD_BAR_BACK_COLOR = (38, 42, 54)
 HUD_HP_GREEN = (60, 220, 100)
 HUD_HP_YELLOW = (245, 210, 60)
@@ -30,38 +39,33 @@ HUD_BOSS_ORANGE = (255, 165, 60)
 HUD_BOSS_RED = (235, 70, 64)
 HUD_DRONE_GRAY = (90, 92, 104)
 
-BASE_FONT_SIZE = 22
-SMALL_FONT_SIZE = 18
-ALERT_FONT_SIZE = 56
-BOSS_FONT_SIZE = 24
-TOP_MARGIN = 14
-LEFT_MARGIN = 16
-RIGHT_X = SCREEN_WIDTH - 238
-HP_BAR_RECT = pygame.Rect(18, 18, 230, 18)
-HP_TEXT_POSITION = (18, 42)
-LIVES_POSITION = (18, 66)
-LIVES_ICON_SIZE = (28, 28)
-LIVES_ICON_SPACING = 32
-FC_POSITION = (RIGHT_X, 18)
-SCORE_POSITION = (RIGHT_X, 42)
-WAVE_POSITION = (RIGHT_X, 66)
+BASE_FONT_SIZE = 18
+SMALL_FONT_SIZE = 14
+ALERT_FONT_SIZE = 48
+BOSS_FONT_SIZE = 20
+TOP_HUD_RECT = pygame.Rect(6, 6, SCREEN_WIDTH - 12, 58)
+BOTTOM_HUD_RECT = pygame.Rect(6, SCREEN_HEIGHT - 66, SCREEN_WIDTH - 12, 60)
+HUD_RIBBON_COLOR = (8, 18, 34, 230)
+HUD_RIBBON_BORDER_COLOR = (54, 92, 132, 220)
+HP_BAR_RECT = pygame.Rect(18, 42, 180, 10)
+LIVES_POSITION = (252, 38)
+LIVES_ICON_SIZE = (17, 17)
+LIVES_ICON_SPACING = 18
 WEAPON_SLOT_RECTS = (
-    pygame.Rect(18, SCREEN_HEIGHT - 158, 260, 38),
-    pygame.Rect(18, SCREEN_HEIGHT - 112, 260, 38),
-    pygame.Rect(18, SCREEN_HEIGHT - 66, 260, 38),
+    pygame.Rect(18, SCREEN_HEIGHT - 41, 204, 30),
+    pygame.Rect(228, SCREEN_HEIGHT - 41, 204, 30),
+    pygame.Rect(438, SCREEN_HEIGHT - 41, 212, 30),
 )
-DRONE_START_X = SCREEN_WIDTH - 134
-DRONE_Y = SCREEN_HEIGHT - 96
-DRONE_SPACING = 36
-DRONE_RADIUS = 13
-BOSS_BAR_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 220, 26, 440, 16)
-BOSS_NAME_POSITION = (SCREEN_WIDTH // 2 - 220, 6)
+DRONE_RADIUS = 8
+BOSS_SECTION_RECT = pygame.Rect(312, 13, 372, 44)
+BOSS_BAR_RECT = pygame.Rect(324, 39, 348, 10)
 CENTER_ALERT_Y = SCREEN_HEIGHT // 2 - 72
 ALERT_DURATION_SECONDS = 3.0
-STAR_FILLED = "★"
-STAR_EMPTY = "☆"
 MAX_STARS = 3
-FC_ICON = "⚙"
+WEAPON_STAR_OUTER_RADIUS = 4
+WEAPON_STAR_INNER_RADIUS = 2
+WEAPON_STAR_SPACING = 10
+WEAPON_STAR_GAP = 3
 
 DRONE_COLORS = {
     SupportDrone: (120, 240, 155),
@@ -121,6 +125,7 @@ class HUD:
         """Draw the complete HUD overlay on top of the game scene."""
         self.update(0.0, combo_name=combo_name, wave_clear=wave_clear)
         if player is not None:
+            self._draw_hud_bars(surface)
             self._draw_player_status(surface, player)
             self._draw_resource_status(surface, player, current_wave, total_waves)
             self._draw_weapon_slots(surface, player)
@@ -157,26 +162,51 @@ class HUD:
         for key in expired_keys:
             del self._alerts[key]
 
+    def _draw_hud_bars(self, surface: pygame.Surface) -> None:
+        """Draw separate translucent status and loadout bars at the screen edges."""
+        for rect in (TOP_HUD_RECT, BOTTOM_HUD_RECT):
+            ribbon = pygame.Surface(rect.size, pygame.SRCALPHA)
+            local_rect = ribbon.get_rect()
+            pygame.draw.rect(ribbon, HUD_RIBBON_COLOR, local_rect, border_radius=10)
+            pygame.draw.rect(ribbon, HUD_RIBBON_BORDER_COLOR, local_rect, 1, border_radius=10)
+            surface.blit(ribbon, rect.topleft)
+        for divider_x in (306, 690):
+            pygame.draw.line(surface, COLOR_BORDER, (divider_x, 15), (divider_x, 55), 1)
+        pygame.draw.line(
+            surface,
+            COLOR_BORDER,
+            (668, BOTTOM_HUD_RECT.y + 8),
+            (668, BOTTOM_HUD_RECT.bottom - 8),
+            1,
+        )
+
     def _draw_player_status(self, surface: pygame.Surface, player: object) -> None:
-        """Draw top-left HP bar and HP text."""
+        """Draw labeled HP and lives in the top bar's ship-status section."""
         hp = int(getattr(player, "hp", 0))
         max_hp = max(1, int(getattr(player, "max_hp", 1)))
         hp_ratio = _clamp_ratio(hp / max_hp)
-        pygame.draw.rect(surface, HUD_BAR_BACK_COLOR, HP_BAR_RECT)
+        heading = self._get_small_font().render("SHIP STATUS", True, HUD_MUTED_COLOR)
+        surface.blit(heading, heading.get_rect(left=18, centery=23))
+        hp_label = self._get_small_font().render(f"{hp} / {max_hp} HP", True, HUD_TEXT_COLOR)
+        surface.blit(hp_label, hp_label.get_rect(right=290, centery=23))
+        pygame.draw.rect(surface, HUD_BAR_BACK_COLOR, HP_BAR_RECT, border_radius=5)
         fill_rect = pygame.Rect(HP_BAR_RECT.x, HP_BAR_RECT.y, int(HP_BAR_RECT.width * hp_ratio), HP_BAR_RECT.height)
-        pygame.draw.rect(surface, _hp_color(hp_ratio), fill_rect)
-        self._draw_text(surface, f"HP: {hp} / {max_hp}", HP_TEXT_POSITION)
+        pygame.draw.rect(surface, _hp_color(hp_ratio), fill_rect, border_radius=5)
         self._draw_lives_icons(surface, int(getattr(player, "lives", 0)))
 
     def _draw_lives_icons(self, surface: pygame.Surface, lives: int) -> None:
         """Draw heart icon sprites for each remaining life."""
         icon = load_sprite("lives_icon", LIVES_ICON_SIZE)
         x, y = LIVES_POSITION
+        lives_label = self._get_small_font().render("LIVES", True, HUD_MUTED_COLOR)
+        surface.blit(lives_label, lives_label.get_rect(left=210, centery=y + 8))
+        icon_x = x
         if icon is not None:
             for i in range(lives):
-                surface.blit(icon, (x + i * LIVES_ICON_SPACING, y))
+                surface.blit(icon, (icon_x + i * LIVES_ICON_SPACING, y))
         else:
-            self._draw_text(surface, f"Lives: {lives}", LIVES_POSITION, small=True)
+            value = self._get_small_font().render(str(lives), True, HUD_TEXT_COLOR)
+            surface.blit(value, (icon_x, y + 3))
 
     def _draw_resource_status(
         self,
@@ -185,45 +215,111 @@ class HUD:
         current_wave: int | None,
         total_waves: int | None,
     ) -> None:
-        """Draw top-right FC, score, and wave status."""
+        """Draw labeled mission values in the top bar's right section."""
+        mission_left = 702
+        mission_right = 1000
+        label_value_gap = 12
+        resource_group_gap = 18
         fc_inventory = int(getattr(player, "fc_inventory", 0))
         score = int(getattr(player, "score", 0))
-        self._draw_text(surface, f"{FC_ICON} {fc_inventory} FC", FC_POSITION)
-        self._draw_text(surface, f"Score: {score:,}", SCORE_POSITION)
+        heading = self._get_small_font().render("MISSION", True, HUD_MUTED_COLOR)
+        surface.blit(heading, heading.get_rect(left=mission_left, centery=23))
         if current_wave is not None and total_waves is not None:
-            self._draw_text(surface, f"Wave {current_wave} / {total_waves}", WAVE_POSITION)
+            wave = self._get_font().render(f"WAVE {current_wave} / {total_waves}", True, COLOR_ACCENT_HOVER)
+            surface.blit(wave, wave.get_rect(right=mission_right, centery=23))
+
+        score_value = self._get_font().render(f"{score:,}", True, HUD_TEXT_COLOR)
+        score_value_rect = score_value.get_rect(right=mission_right, centery=48)
+        score_label = self._get_small_font().render("SCORE", True, HUD_MUTED_COLOR)
+        score_label_rect = score_label.get_rect(right=score_value_rect.left - label_value_gap, centery=48)
+
+        fc_label = self._get_small_font().render("FEATHER CORES", True, HUD_MUTED_COLOR)
+        fc_label_rect = fc_label.get_rect(left=mission_left, centery=48)
+        fc_value = self._get_font().render(str(fc_inventory), True, COLOR_WARNING)
+        fc_value_rect = fc_value.get_rect(left=fc_label_rect.right + label_value_gap, centery=48)
+        if fc_value_rect.right + resource_group_gap > score_label_rect.left:
+            fc_label = self._get_small_font().render("FC", True, HUD_MUTED_COLOR)
+            fc_label_rect = fc_label.get_rect(left=mission_left, centery=48)
+            fc_value_rect = fc_value.get_rect(left=fc_label_rect.right + label_value_gap, centery=48)
+
+        surface.blit(fc_label, fc_label_rect)
+        surface.blit(fc_value, fc_value_rect)
+        surface.blit(score_label, score_label_rect)
+        surface.blit(score_value, score_value_rect)
 
     def _draw_weapon_slots(self, surface: pygame.Surface, player: object) -> None:
-        """Draw bottom-left weapon slots."""
+        """Draw three readable weapon tabs inside the bottom loadout bar."""
+        heading = self._get_small_font().render("WEAPONS", True, HUD_MUTED_COLOR)
+        surface.blit(heading, heading.get_rect(left=18, centery=BOTTOM_HUD_RECT.y + 14))
+        select_hint = self._get_small_font().render("1-3 SELECT", True, COLOR_ACCENT_HOVER)
+        surface.blit(select_hint, select_hint.get_rect(left=104, centery=BOTTOM_HUD_RECT.y + 14))
+        cycle_hint = self._get_small_font().render("TAB TO CYCLE", True, COLOR_ACCENT_HOVER)
+        surface.blit(cycle_hint, cycle_hint.get_rect(left=202, centery=BOTTOM_HUD_RECT.y + 14))
         weapon_slots = list(getattr(player, "weapon_slots", []))
         active_slot = int(getattr(player, "active_weapon_slot", 0))
         for slot_index, rect in enumerate(WEAPON_SLOT_RECTS):
             weapon = weapon_slots[slot_index] if slot_index < len(weapon_slots) else None
-            self._draw_weapon_slot(surface, rect, weapon, f"Weapon {slot_index + 1}", active=slot_index == active_slot)
+            self._draw_weapon_slot(surface, rect, weapon, slot_index + 1, active=slot_index == active_slot)
 
     def _draw_weapon_slot(
         self,
         surface: pygame.Surface,
         rect: pygame.Rect,
         weapon: object | None,
-        empty_label: str,
+        slot_number: int,
         *,
         active: bool = False,
     ) -> None:
         """Draw one weapon slot with stars and cooldown overlay."""
-        pygame.draw.rect(surface, HUD_ACTIVE_PANEL_COLOR if active else HUD_PANEL_COLOR, rect)
+        fill_color = HUD_ACTIVE_PANEL_COLOR if active else COLOR_PANEL_RAISED
+        border_color = HUD_ACTIVE_BORDER_COLOR if active else COLOR_BORDER
+        pygame.draw.rect(surface, fill_color, rect, border_radius=7)
+        pygame.draw.rect(surface, border_color, rect, 1, border_radius=7)
         if active:
-            pygame.draw.rect(surface, HUD_ACTIVE_BORDER_COLOR, rect, 2)
+            accent_rect = pygame.Rect(rect.x, rect.y + 6, 3, rect.height - 12)
+            pygame.draw.rect(surface, COLOR_ACCENT, accent_rect, border_radius=2)
+
+        badge_center = (rect.x + 14, rect.centery)
+        pygame.draw.circle(surface, COLOR_ACCENT if active else HUD_BAR_BACK_COLOR, badge_center, 9)
+        badge = self._get_small_font().render(str(slot_number), True, HUD_TEXT_COLOR)
+        surface.blit(badge, badge.get_rect(center=badge_center))
         if weapon is None:
-            prefix = "ACTIVE " if active else ""
-            self._draw_text(surface, f"{prefix}{empty_label}: Empty", (rect.x + 8, rect.y + 9), small=True)
+            empty = self._get_small_font().render("Empty", True, HUD_MUTED_COLOR)
+            surface.blit(empty, empty.get_rect(left=rect.x + 27, centery=rect.centery))
             return
 
         level = int(getattr(weapon, "upgrade_level", 1))
-        name = str(getattr(weapon, "name", empty_label))
-        prefix = "ACTIVE " if active else ""
-        self._draw_text(surface, f"{prefix}{name} {_stars(level)}", (rect.x + 8, rect.y + 7), small=True)
+        name = str(getattr(weapon, "name", f"Weapon {slot_number}"))
+        label_surface = self._get_small_font().render(name, True, HUD_TEXT_COLOR)
+        label_position = (rect.x + 27, rect.centery - label_surface.get_height() // 2)
+        surface.blit(label_surface, label_position)
+        label_center_y = label_position[1] + label_surface.get_height() // 2
+        self._draw_weapon_stars(
+            surface,
+            (
+                label_position[0] + label_surface.get_width() + WEAPON_STAR_GAP + WEAPON_STAR_OUTER_RADIUS,
+                label_center_y,
+            ),
+            level,
+        )
         self._draw_cooldown_pie(surface, rect, weapon)
+
+    def _draw_weapon_stars(
+        self,
+        surface: pygame.Surface,
+        position: tuple[int, int],
+        level: int,
+    ) -> None:
+        """Draw weapon level stars without relying on font glyph support."""
+        clamped_level = max(0, min(MAX_STARS, level))
+        start_x, center_y = position
+        for star_index in range(MAX_STARS):
+            center = (start_x + star_index * WEAPON_STAR_SPACING, center_y)
+            points = _star_points(center, WEAPON_STAR_OUTER_RADIUS, WEAPON_STAR_INNER_RADIUS)
+            if star_index < clamped_level:
+                pygame.draw.polygon(surface, HUD_TEXT_COLOR, points)
+            else:
+                pygame.draw.polygon(surface, HUD_MUTED_COLOR, points, 1)
 
     def _draw_cooldown_pie(self, surface: pygame.Surface, rect: pygame.Rect, weapon: object) -> None:
         """Draw a simple pie-fill overlay for weapon cooldown."""
@@ -233,8 +329,8 @@ class HUD:
             return
 
         cooldown_ratio = _clamp_ratio(current / cooldown)
-        center = (rect.right - 23, rect.y + rect.height // 2)
-        radius = 14
+        center = (rect.right - 10, rect.y + rect.height // 2)
+        radius = 7
         pygame.draw.circle(surface, HUD_BAR_BACK_COLOR, center, radius)
         points = [center]
         steps = max(2, int(18 * cooldown_ratio))
@@ -249,20 +345,32 @@ class HUD:
             pygame.draw.polygon(surface, HUD_COOLDOWN_COLOR, points)
 
     def _draw_drone_icons(self, surface: pygame.Surface, player: object) -> None:
-        """Draw the single bottom-right drone icon using sprite; grayed when destroyed."""
+        """Draw a labeled drone status area inside the bottom loadout bar."""
         drones = list(getattr(player, "drones", []))[:MAX_ACTIVE_DRONES]
-        center = (DRONE_START_X, DRONE_Y)
+        center = (990, BOTTOM_HUD_RECT.y + 40)
+        label = self._get_small_font().render("SUPPORT DRONE", True, HUD_MUTED_COLOR)
+        surface.blit(label, label.get_rect(left=690, centery=BOTTOM_HUD_RECT.y + 14))
+        mode_hint = self._get_small_font().render("Q MODE", True, COLOR_ACCENT_HOVER)
+        surface.blit(mode_hint, mode_hint.get_rect(right=1000, centery=BOTTOM_HUD_RECT.y + 14))
         if not drones:
-            # Draw an empty slot indicator
             pygame.draw.circle(surface, HUD_BAR_BACK_COLOR, center, DRONE_RADIUS)
+            status = self._get_small_font().render("OFFLINE", True, HUD_MUTED_COLOR)
+            surface.blit(status, status.get_rect(left=690, centery=center[1]))
             return
         drone = drones[0]
         is_dead = getattr(drone, "is_destroyed", False)
         sprite = getattr(drone, "_get_sprite", lambda: None)()
+        status_color = HUD_BOSS_RED if is_dead else COLOR_SUCCESS
+        status_text = "DESTROYED" if is_dead else "ONLINE"
+        status = self._get_small_font().render(status_text, True, status_color)
+        surface.blit(status, status.get_rect(left=690, centery=center[1]))
+        if not is_dead:
+            mode = getattr(getattr(player, "drone_mode", None), "value", "AUTO")
+            mode_text = self._get_small_font().render(str(mode), True, COLOR_ACCENT_HOVER)
+            surface.blit(mode_text, mode_text.get_rect(left=790, centery=center[1]))
         if sprite is not None and not is_dead:
-            icon_size = DRONE_RADIUS * 2
-            icon_rect = (center[0] - DRONE_RADIUS, center[1] - DRONE_RADIUS)
-            surface.blit(sprite, icon_rect)
+            icon = pygame.transform.smoothscale(sprite, (DRONE_RADIUS * 2, DRONE_RADIUS * 2))
+            surface.blit(icon, icon.get_rect(center=center))
         else:
             color = HUD_DRONE_GRAY if is_dead else _drone_color(drone)
             pygame.draw.circle(surface, color, center, DRONE_RADIUS)
@@ -276,10 +384,18 @@ class HUD:
         max_hp = max(1.0, float(getattr(boss, "max_hp", 1.0)))
         hp_ratio = _clamp_ratio(hp / max_hp)
         boss_name = _display_name(type(boss).__name__)
-        self._draw_text(surface, boss_name, BOSS_NAME_POSITION, boss=True)
-        pygame.draw.rect(surface, HUD_BAR_BACK_COLOR, BOSS_BAR_RECT)
-        fill_rect = pygame.Rect(BOSS_BAR_RECT.x, BOSS_BAR_RECT.y, int(BOSS_BAR_RECT.width * hp_ratio), BOSS_BAR_RECT.height)
-        pygame.draw.rect(surface, _boss_color(boss, hp_ratio), fill_rect)
+        pygame.draw.rect(surface, COLOR_PANEL_RAISED, BOSS_SECTION_RECT, border_radius=7)
+        pygame.draw.rect(surface, COLOR_BORDER, BOSS_SECTION_RECT, 1, border_radius=7)
+        name_surface = self._get_small_font().render(f"BOSS  {boss_name}", True, HUD_TEXT_COLOR)
+        surface.blit(name_surface, name_surface.get_rect(left=BOSS_SECTION_RECT.x + 12, centery=24))
+        pygame.draw.rect(surface, HUD_BAR_BACK_COLOR, BOSS_BAR_RECT, border_radius=5)
+        fill_rect = pygame.Rect(
+            BOSS_BAR_RECT.x,
+            BOSS_BAR_RECT.y,
+            int(BOSS_BAR_RECT.width * hp_ratio),
+            BOSS_BAR_RECT.height,
+        )
+        pygame.draw.rect(surface, _boss_color(boss, hp_ratio), fill_rect, border_radius=5)
 
     def _draw_alerts(self, surface: pygame.Surface) -> None:
         """Draw center alerts that fade after 3 seconds."""
@@ -325,25 +441,25 @@ class HUD:
     def _get_font(self) -> pygame.font.Font:
         """Create the base HUD font lazily."""
         if self._font is None:
-            self._font = pygame.font.Font(None, BASE_FONT_SIZE)
+            self._font = load_font(BASE_FONT_SIZE)
         return self._font
 
     def _get_small_font(self) -> pygame.font.Font:
         """Create the small HUD font lazily."""
         if self._small_font is None:
-            self._small_font = pygame.font.Font(None, SMALL_FONT_SIZE)
+            self._small_font = load_font(SMALL_FONT_SIZE)
         return self._small_font
 
     def _get_alert_font(self) -> pygame.font.Font:
         """Create the alert font lazily."""
         if self._alert_font is None:
-            self._alert_font = pygame.font.Font(None, ALERT_FONT_SIZE)
+            self._alert_font = load_font(ALERT_FONT_SIZE)
         return self._alert_font
 
     def _get_boss_font(self) -> pygame.font.Font:
         """Create the boss label font lazily."""
         if self._boss_font is None:
-            self._boss_font = pygame.font.Font(None, BOSS_FONT_SIZE)
+            self._boss_font = load_font(BOSS_FONT_SIZE)
         return self._boss_font
 
 
@@ -370,10 +486,22 @@ def _boss_color(boss: object, hp_ratio: float) -> tuple[int, int, int]:
     return HUD_BOSS_RED
 
 
-def _stars(level: int) -> str:
-    """Return three level stars for a weapon."""
-    clamped_level = max(0, min(MAX_STARS, level))
-    return STAR_FILLED * clamped_level + STAR_EMPTY * (MAX_STARS - clamped_level)
+def _star_points(
+    center: tuple[int, int],
+    outer_radius: int,
+    inner_radius: int,
+) -> list[tuple[int, int]]:
+    """Return the ten alternating vertices of a five-point star."""
+    center_x, center_y = center
+    points: list[tuple[int, int]] = []
+    for point_index in range(10):
+        radius = outer_radius if point_index % 2 == 0 else inner_radius
+        angle = radians(-90 + point_index * 36)
+        points.append((
+            round(center_x + radius * cos(angle)),
+            round(center_y + radius * sin(angle)),
+        ))
+    return points
 
 
 def _drone_color(drone: object) -> tuple[int, int, int]:

@@ -10,7 +10,21 @@ import pygame
 from src.core.game_scene import GameScene
 from src.core.scene_manager import Scene, SceneManager
 from src.systems.save_manager import SaveManager
-from src.utils.constants import SCREEN_HEIGHT, SCREEN_WIDTH
+from src.ui.theme import (
+    COLOR_ACCENT_HOVER,
+    COLOR_DANGER,
+    COLOR_MUTED,
+    COLOR_PANEL_RAISED,
+    COLOR_SUCCESS,
+    COLOR_TEXT,
+    COLOR_WARNING,
+    draw_button,
+    draw_panel,
+    draw_space_background,
+    mouse_over,
+)
+from src.utils.constants import SCREEN_WIDTH
+from src.utils.resource import load_font
 from src.weapons.laser_cannon import LaserCannon
 from src.weapons.missile_salvo import MissileSalvo
 from src.weapons.plasma_spread import PlasmaSpread
@@ -20,49 +34,45 @@ if TYPE_CHECKING:
     from src.entities.player_ship import PlayerShip
     from src.weapons.weapon import Weapon
 
-PREP_BG_COLOR = (8, 13, 25)
-PREP_TEXT_COLOR = (230, 240, 255)
-PREP_MUTED_TEXT_COLOR = (150, 165, 190)
-PREP_ERROR_COLOR = (255, 90, 90)
-PREP_BUTTON_COLOR = (34, 72, 110)
-PREP_BUTTON_DISABLED_COLOR = (54, 58, 70)
-PREP_BUTTON_TEXT_COLOR = (255, 255, 255)
+PREP_TEXT_COLOR = COLOR_TEXT
+PREP_MUTED_TEXT_COLOR = COLOR_MUTED
+PREP_ERROR_COLOR = COLOR_DANGER
 PREP_HP_BACK_COLOR = (60, 26, 34)
-PREP_HP_FILL_COLOR = (80, 220, 130)
-PREP_FONT_SIZE = 22
-PREP_SMALL_FONT_SIZE = 18
-PREP_TITLE_FONT_SIZE = 50
+PREP_HP_FILL_COLOR = COLOR_SUCCESS
+PREP_FONT_SIZE = 18
+PREP_SMALL_FONT_SIZE = 14
+PREP_TITLE_FONT_SIZE = 42
 PREP_CENTER_X = SCREEN_WIDTH // 2
-PREP_TITLE_Y = 58
-SECTION_WIDTH = 260
-SECTION_LEFT_X = 78
-SECTION_MIDDLE_X = PREP_CENTER_X - SECTION_WIDTH // 2
-SECTION_RIGHT_X = SCREEN_WIDTH - SECTION_LEFT_X - SECTION_WIDTH
-BUTTON_WIDTH = 214
-BUTTON_HEIGHT = 34
-SLOT_BUTTON_WIDTH = 42
-SLOT_BUTTON_GAP = 8
-HP_BAR_WIDTH = 360
-HP_BAR_HEIGHT = 20
-LINE_HEIGHT = 40
-STATUS_Y = 126
-PROGRESSION_TIP_Y = 232
-SECTION_HEADING_Y = 278
-SECTION_BODY_Y = 316
-WEAPON_SLOT_SPACING = 70
-WEAPON_BUTTON_X = SECTION_LEFT_X + 18
-SHOP_HEADING_Y = SECTION_HEADING_Y
-SHOP_BODY_Y = SECTION_BODY_Y
-SHOP_ROW_HEIGHT = 46
-SHOP_LABEL_X = SECTION_MIDDLE_X
-SHOP_SLOT_ONE_X = SECTION_MIDDLE_X + 150
-SHOP_SLOT_TWO_X = SHOP_SLOT_ONE_X + SLOT_BUTTON_WIDTH + SLOT_BUTTON_GAP
-SHOP_SLOT_THREE_X = SHOP_SLOT_TWO_X + SLOT_BUTTON_WIDTH + SLOT_BUTTON_GAP
-REPAIR_SECTION_Y = 548
-BEGIN_BUTTON_RECT = pygame.Rect(PREP_CENTER_X - 115, SCREEN_HEIGHT - 76, 230, 44)
-REPAIR_BUTTON_RECT = pygame.Rect(SECTION_RIGHT_X, REPAIR_SECTION_Y + 28, BUTTON_WIDTH, BUTTON_HEIGHT)
-LIFE_BUTTON_RECT = pygame.Rect(SECTION_RIGHT_X, REPAIR_SECTION_Y + 70, BUTTON_WIDTH, BUTTON_HEIGHT)
-FEEDBACK_Y = SCREEN_HEIGHT - 106
+PREP_TITLE_POSITION = (44, 24)
+STATUS_CARD_RECT = pygame.Rect(36, 96, SCREEN_WIDTH - 72, 114)
+HP_BAR_RECT = pygame.Rect(58, 153, 450, 18)
+LIVES_CARD_RECT = pygame.Rect(548, 119, 168, 66)
+FC_CARD_RECT = pygame.Rect(734, 119, 232, 66)
+LOADOUT_CARD_RECT = pygame.Rect(36, 228, 300, 418)
+SHOP_CARD_RECT = pygame.Rect(354, 228, 320, 418)
+SERVICES_CARD_RECT = pygame.Rect(692, 228, 296, 418)
+SECTION_HEADING_Y = 258
+LOADOUT_SLOT_X = 52
+LOADOUT_SLOT_WIDTH = 268
+LOADOUT_SLOT_HEIGHT = 96
+LOADOUT_SLOT_START_Y = 290
+LOADOUT_SLOT_SPACING = 112
+SHOP_ROW_X = 370
+SHOP_ROW_WIDTH = 288
+SHOP_ROW_HEIGHT = 94
+SHOP_ROW_START_Y = 290
+SHOP_ROW_SPACING = 108
+SLOT_BUTTON_WIDTH = 52
+SLOT_BUTTON_HEIGHT = 32
+SLOT_BUTTON_GAP = 6
+DRONE_PANEL_RECT = pygame.Rect(708, 290, 264, 142)
+SERVICE_BUTTON_WIDTH = 264
+SERVICE_BUTTON_HEIGHT = 40
+DRONE_BUTTON_Y = 374
+REPAIR_BUTTON_RECT = pygame.Rect(708, 514, SERVICE_BUTTON_WIDTH, SERVICE_BUTTON_HEIGHT)
+LIFE_BUTTON_RECT = pygame.Rect(708, 568, SERVICE_BUTTON_WIDTH, SERVICE_BUTTON_HEIGHT)
+BEGIN_BUTTON_RECT = pygame.Rect(PREP_CENTER_X - 142, 698, 284, 48)
+FEEDBACK_Y = 674
 DRONE_SUMMON_COST = 30
 LIFE_PURCHASE_COST = 160
 MAX_PURCHASED_LIVES = 5
@@ -119,11 +129,12 @@ class PreparationScene(Scene):
 
     def render(self, surface: pygame.Surface) -> None:
         """Render ship status, weapons, drones, unlocks, repairs, and mission start."""
-        surface.fill(PREP_BG_COLOR)
+        draw_space_background(surface)
         self._buttons = []
         self._draw_title(surface)
         self._draw_ship_status(surface)
         self._draw_progression_tip(surface)
+        self._draw_section_panels(surface)
         self._draw_weapon_section(surface)
         self._draw_weapon_shop(surface)
         self._draw_drone_section(surface)
@@ -149,7 +160,7 @@ class PreparationScene(Scene):
 
         success = bool(action())
         if success:
-            self.feedback_text = f"{label} complete"
+            self.feedback_text = _success_message(label)
             self.feedback_color = PREP_TEXT_COLOR
         elif cost > 0:
             self.feedback_text = "Action unavailable"
@@ -157,23 +168,39 @@ class PreparationScene(Scene):
 
     def _draw_title(self, surface: pygame.Surface) -> None:
         """Draw the preparation title."""
-        title = self._get_title_font().render("Preparation", True, PREP_TEXT_COLOR)
-        _blit_centered(surface, title, PREP_CENTER_X, PREP_TITLE_Y)
+        title = self._get_title_font().render("Preparation Bay", True, PREP_TEXT_COLOR)
+        surface.blit(title, PREP_TITLE_POSITION)
+        subtitle = self._get_small_font().render("Configure your ship before deployment", True, PREP_MUTED_TEXT_COLOR)
+        surface.blit(subtitle, (PREP_TITLE_POSITION[0] + 2, PREP_TITLE_POSITION[1] + 49))
+        current_map = int(self.game_state.get("current_map", 1))
+        map_label = self._get_font().render(f"MAP {current_map}", True, COLOR_ACCENT_HOVER)
+        surface.blit(map_label, map_label.get_rect(right=SCREEN_WIDTH - 44, centery=52))
 
     def _draw_ship_status(self, surface: pygame.Surface) -> None:
         """Draw HP, lives, and FC inventory."""
+        draw_panel(surface, STATUS_CARD_RECT, raised=True)
         font = self._get_font()
-        hp_label = font.render(f"Ship HP {int(self.player.hp)}/{int(self.player.max_hp)}", True, PREP_TEXT_COLOR)
-        _blit_centered(surface, hp_label, PREP_CENTER_X, STATUS_Y)
-        bar_rect = pygame.Rect(PREP_CENTER_X - HP_BAR_WIDTH // 2, STATUS_Y + 28, HP_BAR_WIDTH, HP_BAR_HEIGHT)
-        pygame.draw.rect(surface, PREP_HP_BACK_COLOR, bar_rect)
+        small_font = self._get_small_font()
+        status_label = small_font.render("SHIP INTEGRITY", True, PREP_MUTED_TEXT_COLOR)
+        surface.blit(status_label, (58, 117))
+        hp_label = font.render(f"{int(self.player.hp)} / {int(self.player.max_hp)} HP", True, PREP_TEXT_COLOR)
+        surface.blit(hp_label, hp_label.get_rect(right=HP_BAR_RECT.right, centery=125))
+        pygame.draw.rect(surface, PREP_HP_BACK_COLOR, HP_BAR_RECT, border_radius=9)
         hp_ratio = self.player.hp / self.player.max_hp if self.player.max_hp > 0 else 0.0
-        fill_rect = pygame.Rect(bar_rect.x, bar_rect.y, int(bar_rect.width * hp_ratio), bar_rect.height)
-        pygame.draw.rect(surface, PREP_HP_FILL_COLOR, fill_rect)
-        lives_text = self._get_small_font().render(f"Lives: {int(getattr(self.player, 'lives', 0))}", True, PREP_TEXT_COLOR)
-        _blit_centered(surface, lives_text, PREP_CENTER_X, STATUS_Y + 58)
-        fc_text = font.render(f"FC: {self.player.fc_inventory}", True, PREP_TEXT_COLOR)
-        _blit_centered(surface, fc_text, PREP_CENTER_X, STATUS_Y + 82)
+        fill_rect = pygame.Rect(HP_BAR_RECT.x, HP_BAR_RECT.y, int(HP_BAR_RECT.width * hp_ratio), HP_BAR_RECT.height)
+        pygame.draw.rect(surface, PREP_HP_FILL_COLOR, fill_rect, border_radius=9)
+
+        draw_panel(surface, LIVES_CARD_RECT, raised=False, shadow=False)
+        lives_label = small_font.render("LIVES", True, PREP_MUTED_TEXT_COLOR)
+        lives_value = font.render(str(int(getattr(self.player, "lives", 0))), True, PREP_TEXT_COLOR)
+        surface.blit(lives_label, (LIVES_CARD_RECT.x + 16, LIVES_CARD_RECT.y + 11))
+        surface.blit(lives_value, (LIVES_CARD_RECT.x + 16, LIVES_CARD_RECT.y + 31))
+
+        draw_panel(surface, FC_CARD_RECT, raised=False, shadow=False)
+        fc_label = small_font.render("FEATHER CORES", True, PREP_MUTED_TEXT_COLOR)
+        fc_value = font.render(f"{self.player.fc_inventory} FC", True, COLOR_WARNING)
+        surface.blit(fc_label, (FC_CARD_RECT.x + 16, FC_CARD_RECT.y + 11))
+        surface.blit(fc_value, (FC_CARD_RECT.x + 16, FC_CARD_RECT.y + 31))
 
     def _draw_progression_tip(self, surface: pygame.Surface) -> None:
         """Draw map-specific weapon guidance for upcoming enemy mechanics."""
@@ -184,47 +211,80 @@ class PreparationScene(Scene):
             tip = "Map 3+: Missile AOE can damage Dodge Hen"
         else:
             tip = "Buy a second weapon before harder maps"
-        _blit_centered(surface, self._get_small_font().render(tip, True, PREP_MUTED_TEXT_COLOR), PREP_CENTER_X, PROGRESSION_TIP_Y)
+        tip_surface = self._get_small_font().render(tip, True, PREP_MUTED_TEXT_COLOR)
+        surface.blit(tip_surface, (58, 181))
+
+    def _draw_section_panels(self, surface: pygame.Surface) -> None:
+        """Draw the three task-focused preparation cards."""
+        draw_panel(surface, LOADOUT_CARD_RECT, raised=True)
+        draw_panel(surface, SHOP_CARD_RECT, raised=True)
+        draw_panel(surface, SERVICES_CARD_RECT, raised=True)
 
     def _draw_weapon_section(self, surface: pygame.Surface) -> None:
         """Draw weapon slots and upgrade buttons."""
         font = self._get_font()
-        heading = font.render("Weapons", True, PREP_TEXT_COLOR)
-        _blit_centered(surface, heading, SECTION_LEFT_X + SECTION_WIDTH // 2, SECTION_HEADING_Y)
+        small_font = self._get_small_font()
+        heading = font.render("Weapon Loadout", True, PREP_TEXT_COLOR)
+        _blit_centered(surface, heading, LOADOUT_CARD_RECT.centerx, SECTION_HEADING_Y)
         for slot_index, weapon in enumerate(self.player.weapon_slots):
-            y = SECTION_BODY_Y + slot_index * WEAPON_SLOT_SPACING
+            y = LOADOUT_SLOT_START_Y + slot_index * LOADOUT_SLOT_SPACING
+            slot_rect = pygame.Rect(LOADOUT_SLOT_X, y, LOADOUT_SLOT_WIDTH, LOADOUT_SLOT_HEIGHT)
+            draw_panel(surface, slot_rect, raised=False, active=weapon is not None, shadow=False)
+            slot_label = small_font.render(f"SLOT {slot_index + 1}", True, PREP_MUTED_TEXT_COLOR)
+            surface.blit(slot_label, (slot_rect.x + 14, slot_rect.y + 10))
             if weapon is None:
-                label = f"Slot {slot_index + 1}: Empty"
-                cost = 0
+                empty_text = font.render("Empty hardpoint", True, PREP_MUTED_TEXT_COLOR)
+                surface.blit(empty_text, (slot_rect.x + 14, slot_rect.y + 40))
+                continue
+
+            name = font.render(str(weapon.name), True, PREP_TEXT_COLOR)
+            surface.blit(name, (slot_rect.x + 14, slot_rect.y + 32))
+            level = small_font.render(f"LV {weapon.upgrade_level}", True, COLOR_ACCENT_HOVER)
+            surface.blit(level, level.get_rect(right=slot_rect.right - 14, centery=slot_rect.y + 43))
+            cost = int(weapon.get_upgrade_cost())
+            if cost > 0:
+                rect = pygame.Rect(slot_rect.x + 12, slot_rect.y + 61, slot_rect.width - 24, 27)
+                self._add_button(
+                    surface,
+                    rect,
+                    f"Upgrade - {cost} FC",
+                    cost,
+                    lambda i=slot_index: self._upgrade_slot(i),
+                )
             else:
-                label = f"Slot {slot_index + 1}: {weapon.name} Lv {weapon.upgrade_level}"
-                cost = int(weapon.get_upgrade_cost())
-            surface.blit(font.render(label, True, PREP_TEXT_COLOR), (SECTION_LEFT_X, y))
-            if weapon is not None and cost > 0:
-                rect = pygame.Rect(WEAPON_BUTTON_X, y + 26, BUTTON_WIDTH, BUTTON_HEIGHT)
-                self._add_button(surface, rect, f"Upgrade ({cost} FC)", cost, lambda i=slot_index: self._upgrade_slot(i))
+                max_level = small_font.render("MAX LEVEL", True, COLOR_SUCCESS)
+                surface.blit(max_level, (slot_rect.x + 14, slot_rect.y + 68))
 
     def _draw_weapon_shop(self, surface: pygame.Surface) -> None:
         """Draw map-gated weapon purchase buttons for each weapon slot."""
         font = self._get_font()
         small_font = self._get_small_font()
         current_map = int(self.game_state.get("current_map", 1))
-        _blit_centered(surface, font.render("Weapon Shop", True, PREP_TEXT_COLOR), SECTION_MIDDLE_X + SECTION_WIDTH // 2, SHOP_HEADING_Y)
+        shop_heading = font.render("Weapon Shop", True, PREP_TEXT_COLOR)
+        _blit_centered(surface, shop_heading, SHOP_CARD_RECT.centerx, SECTION_HEADING_Y)
         for row_index, item in enumerate(get_weapon_shop_items(current_map)):
-            y = SHOP_BODY_Y + row_index * SHOP_ROW_HEIGHT
+            y = SHOP_ROW_START_Y + row_index * SHOP_ROW_SPACING
+            row_rect = pygame.Rect(SHOP_ROW_X, y, SHOP_ROW_WIDTH, SHOP_ROW_HEIGHT)
             unlocked = bool(item["unlocked"])
+            draw_panel(surface, row_rect, raised=False, active=unlocked, shadow=False)
             name = str(item["name"])
             cost = int(item["cost"])
             unlock_map = int(item["unlock_map"])
-            label = f"{name} ({cost} FC)" if unlocked else f"{name} - Map {unlock_map}"
             color = PREP_TEXT_COLOR if unlocked else PREP_MUTED_TEXT_COLOR
-            surface.blit(small_font.render(label, True, color), (SHOP_LABEL_X, y + 8))
+            surface.blit(font.render(name, True, color), (row_rect.x + 14, row_rect.y + 12))
             if not unlocked:
+                lock_text = small_font.render(f"Unlocks on Map {unlock_map}", True, PREP_MUTED_TEXT_COLOR)
+                surface.blit(lock_text, (row_rect.x + 14, row_rect.y + 54))
                 continue
 
+            price = small_font.render(f"{cost} FC", True, COLOR_WARNING)
+            surface.blit(price, (row_rect.x + 14, row_rect.y + 61))
             weapon_key = str(item["key"])
-            for slot_index, x in enumerate((SHOP_SLOT_ONE_X, SHOP_SLOT_TWO_X, SHOP_SLOT_THREE_X)):
-                rect = pygame.Rect(x, y, SLOT_BUTTON_WIDTH, BUTTON_HEIGHT)
+            slot_buttons_width = SLOT_BUTTON_WIDTH * 3 + SLOT_BUTTON_GAP * 2
+            slot_start_x = row_rect.right - slot_buttons_width - 12
+            for slot_index in range(3):
+                x = slot_start_x + slot_index * (SLOT_BUTTON_WIDTH + SLOT_BUTTON_GAP)
+                rect = pygame.Rect(x, row_rect.y + 50, SLOT_BUTTON_WIDTH, SLOT_BUTTON_HEIGHT)
                 self._add_button(
                     surface,
                     rect,
@@ -239,43 +299,78 @@ class PreparationScene(Scene):
         from src.entities.support_drone import SupportDrone
         font = self._get_font()
         small_font = self._get_small_font()
-        _blit_centered(surface, font.render("Support Drone", True, PREP_TEXT_COLOR), SECTION_RIGHT_X + SECTION_WIDTH // 2, SECTION_HEADING_Y)
-        y = SECTION_BODY_Y
+        services_heading = font.render("Support & Services", True, PREP_TEXT_COLOR)
+        _blit_centered(surface, services_heading, SERVICES_CARD_RECT.centerx, SECTION_HEADING_Y)
+        draw_panel(surface, DRONE_PANEL_RECT, raised=False, shadow=False)
+        drone_label = small_font.render("SUPPORT DRONE", True, PREP_MUTED_TEXT_COLOR)
+        surface.blit(drone_label, (DRONE_PANEL_RECT.x + 14, DRONE_PANEL_RECT.y + 12))
 
         active_support = next((d for d in self.player.drones if isinstance(d, SupportDrone)), None)
+        button_rect = pygame.Rect(
+            DRONE_PANEL_RECT.x + 12,
+            DRONE_BUTTON_Y,
+            DRONE_PANEL_RECT.width - 24,
+            SERVICE_BUTTON_HEIGHT,
+        )
 
         if active_support is None:
-            surface.blit(small_font.render("No drone deployed", True, PREP_MUTED_TEXT_COLOR), (SECTION_RIGHT_X, y))
-            y += LINE_HEIGHT
-            # Summon button — only if player has unlocked SupportDrone
+            status = font.render("Not deployed", True, PREP_MUTED_TEXT_COLOR)
+            surface.blit(status, (DRONE_PANEL_RECT.x + 14, DRONE_PANEL_RECT.y + 40))
             if SupportDrone in self.player.unlocked_drones:
-                rect = pygame.Rect(SECTION_RIGHT_X, y, BUTTON_WIDTH, BUTTON_HEIGHT)
-                self._add_button(surface, rect, f"Summon ({DRONE_SUMMON_COST} FC)", DRONE_SUMMON_COST, lambda: self._summon_drone(SupportDrone))
+                self._add_button(
+                    surface,
+                    button_rect,
+                    f"Deploy - {DRONE_SUMMON_COST} FC",
+                    DRONE_SUMMON_COST,
+                    lambda: self._summon_drone(SupportDrone),
+                )
             else:
                 from src.entities.support_drone import SUPPORT_DRONE_UNLOCK_COST
-                rect = pygame.Rect(SECTION_RIGHT_X, y, BUTTON_WIDTH, BUTTON_HEIGHT)
-                self._add_button(surface, rect, f"Unlock ({SUPPORT_DRONE_UNLOCK_COST} FC)", SUPPORT_DRONE_UNLOCK_COST, lambda: self._unlock_drone(SupportDrone))
+                self._add_button(
+                    surface,
+                    button_rect,
+                    f"Unlock - {SUPPORT_DRONE_UNLOCK_COST} FC",
+                    SUPPORT_DRONE_UNLOCK_COST,
+                    lambda: self._unlock_drone(SupportDrone),
+                )
         elif active_support.is_destroyed:
-            surface.blit(small_font.render("Support Drone: Destroyed", True, PREP_ERROR_COLOR), (SECTION_RIGHT_X, y))
-            y += LINE_HEIGHT
-            rect = pygame.Rect(SECTION_RIGHT_X, y, BUTTON_WIDTH, BUTTON_HEIGHT)
-            self._add_button(surface, rect, f"Re-summon ({DRONE_SUMMON_COST} FC)", DRONE_SUMMON_COST, lambda: self._summon_drone(SupportDrone))
+            status = font.render("Destroyed", True, PREP_ERROR_COLOR)
+            surface.blit(status, (DRONE_PANEL_RECT.x + 14, DRONE_PANEL_RECT.y + 40))
+            self._add_button(
+                surface,
+                button_rect,
+                f"Re-deploy - {DRONE_SUMMON_COST} FC",
+                DRONE_SUMMON_COST,
+                lambda: self._summon_drone(SupportDrone),
+            )
         else:
-            surface.blit(small_font.render("Support Drone: Active ✓", True, PREP_TEXT_COLOR), (SECTION_RIGHT_X, y))
-            y += LINE_HEIGHT
-            surface.blit(small_font.render("Collects distant FC drops", True, PREP_MUTED_TEXT_COLOR), (SECTION_RIGHT_X, y))
+            status = font.render("Online", True, COLOR_SUCCESS)
+            surface.blit(status, (DRONE_PANEL_RECT.x + 14, DRONE_PANEL_RECT.y + 40))
+            detail = small_font.render("Collects distant FC drops", True, PREP_MUTED_TEXT_COLOR)
+            surface.blit(detail, (DRONE_PANEL_RECT.x + 14, DRONE_PANEL_RECT.y + 76))
 
 
     def _draw_repair_section(self, surface: pygame.Surface) -> None:
         """Draw repair and life purchase controls."""
         font = self._get_font()
-        surface.blit(font.render("Repair / Lives", True, PREP_TEXT_COLOR), (SECTION_RIGHT_X, REPAIR_SECTION_Y))
-        self._add_button(surface, REPAIR_BUTTON_RECT, "+20% HP (10 FC)", REPAIR_FC_CHUNK, self._repair_ship)
-        self._add_button(surface, LIFE_BUTTON_RECT, f"+1 Life ({LIFE_PURCHASE_COST} FC)", LIFE_PURCHASE_COST, self._purchase_life)
+        small_font = self._get_small_font()
+        pygame.draw.rect(surface, COLOR_PANEL_RAISED, pygame.Rect(708, 456, 264, 1))
+        services_label = small_font.render("SHIP SERVICES", True, PREP_MUTED_TEXT_COLOR)
+        surface.blit(services_label, (708, 478))
+        self._add_button(surface, REPAIR_BUTTON_RECT, "Repair 20% - 10 FC", REPAIR_FC_CHUNK, self._repair_ship)
+        self._add_button(
+            surface,
+            LIFE_BUTTON_RECT,
+            f"Purchase Life - {LIFE_PURCHASE_COST} FC",
+            LIFE_PURCHASE_COST,
+            self._purchase_life,
+        )
+        hint = small_font.render("Services use your current FC balance", True, PREP_MUTED_TEXT_COLOR)
+        surface.blit(hint, (708, 620))
 
     def _draw_begin_button(self, surface: pygame.Surface) -> None:
         """Draw the begin mission button."""
-        self._add_button(surface, BEGIN_BUTTON_RECT, "Begin Mission", 0, self._begin_mission)
+        self._add_button(surface, BEGIN_BUTTON_RECT, "Launch Mission", 0, self._begin_mission, primary=True)
 
     def _draw_feedback(self, surface: pygame.Surface) -> None:
         """Draw current feedback text."""
@@ -293,13 +388,19 @@ class PreparationScene(Scene):
         action: ButtonAction,
         *,
         enabled: bool = True,
+        primary: bool = False,
     ) -> None:
         """Draw and register one button."""
         can_afford = enabled and cost <= self.player.fc_inventory
-        color = PREP_BUTTON_COLOR if can_afford else PREP_BUTTON_DISABLED_COLOR
-        pygame.draw.rect(surface, color, rect)
-        text = self._get_font().render(label, True, PREP_BUTTON_TEXT_COLOR)
-        _blit_centered(surface, text, rect.centerx, rect.centery)
+        draw_button(
+            surface,
+            rect,
+            label,
+            self._get_font(),
+            enabled=can_afford,
+            primary=primary,
+            hovered=can_afford and mouse_over(rect),
+        )
         self._buttons.append({"rect": rect, "label": label, "cost": cost, "action": action, "enabled": enabled})
 
     def _upgrade_slot(self, slot_index: int) -> bool:
@@ -351,25 +452,40 @@ class PreparationScene(Scene):
     def _get_font(self) -> pygame.font.Font:
         """Create the UI font lazily."""
         if self._font is None:
-            self._font = pygame.font.Font(None, PREP_FONT_SIZE)
+            self._font = load_font(PREP_FONT_SIZE)
         return self._font
 
     def _get_small_font(self) -> pygame.font.Font:
         """Create the compact preparation font lazily."""
         if self._small_font is None:
-            self._small_font = pygame.font.Font(None, PREP_SMALL_FONT_SIZE)
+            self._small_font = load_font(PREP_SMALL_FONT_SIZE)
         return self._small_font
 
     def _get_title_font(self) -> pygame.font.Font:
         """Create the title font lazily."""
         if self._title_font is None:
-            self._title_font = pygame.font.Font(None, PREP_TITLE_FONT_SIZE)
+            self._title_font = load_font(PREP_TITLE_FONT_SIZE)
         return self._title_font
 
 
 def _blit_centered(surface: pygame.Surface, rendered: pygame.Surface, center_x: int, center_y: int) -> None:
     """Blit rendered text centered around the given coordinate."""
     surface.blit(rendered, rendered.get_rect(center=(center_x, center_y)))
+
+
+def _success_message(label: str) -> str:
+    """Return concise feedback for preparation actions."""
+    if label.startswith("Upgrade"):
+        return "Weapon upgraded"
+    if label in {"S1", "S2", "S3"}:
+        return "Weapon equipped"
+    if label.startswith(("Unlock", "Deploy", "Re-deploy")):
+        return "Support drone ready"
+    if label.startswith("Repair"):
+        return "Ship repaired"
+    if label.startswith("Purchase Life"):
+        return "Extra life purchased"
+    return "Ready for launch"
 
 
 class PreparationScreen:

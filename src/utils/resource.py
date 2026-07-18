@@ -9,6 +9,8 @@ import pygame
 ASSET_ROOT = Path(__file__).resolve().parents[2] / "assets"
 SPRITE_ROOT = ASSET_ROOT / "sprites"
 AUDIO_ROOT = ASSET_ROOT / "audio"
+_get_default_font = getattr(pygame.font, "get_default_font", None)
+PORTABLE_UI_FONT = _get_default_font() if callable(_get_default_font) else "freesansbold.ttf"
 
 SPRITE_FILES = {
     "background": SPRITE_ROOT / "background.png", "victory_background": SPRITE_ROOT / "victory_background.png",
@@ -38,7 +40,7 @@ DEFAULT_SOUND_VOLUME = 0.45
 BACKGROUND_MUSIC_VOLUME = 0.25
 _sprite_cache: dict[tuple[str, tuple[int, int] | None], pygame.Surface | None] = {}
 _sound_cache: dict[str, object | None] = {}
-_font_cache: dict[tuple[str | None, int], pygame.font.Font] = {}
+_font_cache: dict[tuple[str, int], pygame.font.Font] = {}
 _mixer_failed = False
 _music_started = False
 _sound_effects_muted = False
@@ -81,10 +83,11 @@ def load_enemy_sprite(enemy: object) -> pygame.Surface | None:
 
 
 def load_font(size: int, path: str | None = None) -> pygame.font.Font:
-    """Load and cache a font, using pygame's default when no path is supplied."""
-    cache_key = (path, size)
+    """Load and cache the pygame-bundled UI font or an explicit font path."""
+    resolved_path = path or PORTABLE_UI_FONT
+    cache_key = (resolved_path, size)
     if cache_key not in _font_cache:
-        _font_cache[cache_key] = pygame.font.Font(path, size)
+        _font_cache[cache_key] = pygame.font.Font(resolved_path, size)
     return _font_cache[cache_key]
 
 

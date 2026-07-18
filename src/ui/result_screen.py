@@ -10,7 +10,7 @@ from src.entities.player_ship import PlayerShip
 from src.systems.save_manager import SaveManager
 from src.ui.preparation_screen import PreparationScene
 from src.utils.constants import MAP_COUNT, SCREEN_HEIGHT, SCREEN_WIDTH
-from src.utils.resource import load_sprite
+from src.utils.resource import load_font, load_sprite
 
 RESULT_BG_COLOR = (8, 12, 24)
 RESULT_TEXT_COLOR = (235, 242, 255)
@@ -125,13 +125,13 @@ class ResultScene(Scene):
     def _get_font(self) -> pygame.font.Font:
         """Create the result font lazily."""
         if self._font is None:
-            self._font = pygame.font.Font(None, RESULT_FONT_SIZE)
+            self._font = load_font(RESULT_FONT_SIZE)
         return self._font
 
     def _get_title_font(self) -> pygame.font.Font:
         """Create the result title font lazily."""
         if self._title_font is None:
-            self._title_font = pygame.font.Font(None, RESULT_TITLE_FONT_SIZE)
+            self._title_font = load_font(RESULT_TITLE_FONT_SIZE)
         return self._title_font
 
 
